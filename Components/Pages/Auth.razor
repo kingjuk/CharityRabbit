@@ -1,0 +1,52 @@
+﻿@page "/auth"
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@attribute [Authorize]
+
+<PageTitle>Auth</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">You are authenticated!</MudText>
+
+<AuthorizeView>
+    <Authorized>
+        <MudText Class="mb-4">Hello @userName!</MudText>
+        <MudList T="String">
+            @if (userClaims != null)
+            {
+                @foreach (var claim in userClaims)
+                {
+                    <MudListItem>
+                        <MudText>@claim.Type: @claim.Value</MudText>
+                    </MudListItem>
+                }
+            }
+        </MudList>
+    </Authorized>
+    <NotAuthorized>
+        <MudText>You are not authorized. Please log in.</MudText>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private string userName = "Loading...";
+    private IEnumerable<Claim>? userClaims;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            userName = user.Identity.Name ?? "Unknown User";
+            userClaims = user.Claims;
+        }
+        else
+        {
+            userName = "Not authenticated";
+            userClaims = null;
+        }
+    }
+}

@@ -1,0 +1,86 @@
+using Microsoft.AspNetCore.Components.Authorization;
+using MudBlazor.Services;
+using CharityRabbit.Components;
+using CharityRabbit.Components.Account;
+
+internal class Program
+{
+    protected Program()
+    {
+
+    }
+
+
+    private async static Task Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
+
+        builder.Services.AddHttpContextAccessor();
+
+        // Add MudBlazor services
+        builder.Services.AddMudServices();
+
+        // Add services to the container.
+        builder.Services.AddRazorComponents()
+            .AddInteractiveServerComponents();
+
+        builder.Services.AddCascadingAuthenticationState();
+        builder.Services.AddScoped<IdentityRedirectManager>();
+        builder.Services.AddScoped<AuthenticationStateProvider, OidcAuthenticationStateProvider>();
+
+        builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultScheme = "Cookies";
+            options.DefaultChallengeScheme = "oidc";  // Set OIDC as the challenge scheme
+        })
+        .AddCookie("Cookies")
+        .AddOpenIdConnect("oidc", options =>
+        {
+            options.Authority = builder.Configuration["Oidc:Authority"]; // OIDC provider URL (e.g., Azure AD, Google)
+            options.ClientId = builder.Configuration["Oidc:ClientId"]; // Your client ID
+            options.ClientSecret = builder.Configuration["Oidc:ClientSecret"]; // Your client secret
+            options.ResponseType = "code";  // Authorization Code flow
+            options.Scope.Add("openid");
+            options.Scope.Add("profile");
+            options.Scope.Add("email");
+            options.SaveTokens = true;
+            options.GetClaimsFromUserInfoEndpoint = true;
+            options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+            {
+                NameClaimType = "name",  // Use 'name' claim instead of default 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'
+            };
+        });
+
+        builder.Services.AddAuthorization();
+
+        // builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+
+        var app = builder.Build();
+
+        // Configure the HTTP request pipeline.
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseExceptionHandler("/Error", createScopeForErrors: true);
+            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+            app.UseHsts();
+        }
+
+        app.UseHttpsRedirection();
+
+        app.UseHttpsRedirection();
+        app.UseStaticFiles();
+
+        app.UseRouting();
+
+        app.UseAntiforgery();
+
+        app.UseAuthentication();  
+        app.UseAuthorization();
+
+        app.MapStaticAssets();
+        app.MapRazorComponents<App>()
+            .AddInteractiveServerRenderMode();
+
+        await app.RunAsync();
+    }
+}
