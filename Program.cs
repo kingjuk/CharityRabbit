@@ -2,6 +2,9 @@ using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor.Services;
 using CharityRabbit.Components;
 using CharityRabbit.Components.Account;
+using CharityRabbit.Data;
+using Microsoft.Extensions.Options;
+using GoogleMapsComponents;
 
 internal class Program
 {
@@ -16,6 +19,32 @@ internal class Program
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddHttpContextAccessor();
+
+        // Configure Neo4jSettings from appsettings.json
+        builder.Services.Configure<Neo4jSettings>(builder.Configuration.GetSection("Neo4jSettings"));
+
+        // Register Neo4jService using Neo4jSettings
+        builder.Services.AddSingleton<Neo4jService>(sp =>
+        {
+            var neo4jSettings = sp.GetRequiredService<IOptions<Neo4jSettings>>().Value;
+            var locationServices = sp.GetRequiredService<LocationServices>();
+            return new Neo4jService(neo4jSettings.Uri, neo4jSettings.Username, neo4jSettings.Password, locationServices);
+        });
+
+        builder.Services.AddHttpClient<LocationServices>();
+
+
+        var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"];
+
+        if (googleMapsApiKey == null)
+        {
+            throw new InvalidOperationException("GoogleMaps:ApiKey is not set in appsettings.json");
+        }
+        else
+        {
+            builder.Services.AddBlazorGoogleMaps(googleMapsApiKey);
+        }
+
 
         // Add MudBlazor services
         builder.Services.AddMudServices();

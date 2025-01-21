@@ -1,0 +1,83 @@
+﻿@page "/add-good-work"
+@using System.ComponentModel.DataAnnotations
+@using CharityRabbit.Data
+@using CharityRabbit.Models
+@inject Neo4jService Neo4jService
+
+<EditForm Model="@goodWork" OnValidSubmit="OnValidSubmit" FormName="AddGoodWorkForm">
+    <DataAnnotationsValidator />
+    <MudGrid>
+        <!-- Form Section -->
+        <MudItem xs="12" sm="7">
+            <MudCard>
+                <MudCardContent>
+                    <MudTextField Label="Name" HelperText="Enter the project name"
+                                  @bind-Value="goodWork.Name" For="@(() => goodWork.Name)" />
+
+                    <MudTextField Label="Category" HelperText="Choose a category"
+                                  @bind-Value="goodWork.Category" For="@(() => goodWork.Category)" Class="mt-3" />
+
+                    <MudTextField Label="Description" HelperText="Describe the good work" Lines="3"
+                                  @bind-Value="goodWork.Description" For="@(() => goodWork.Description)" Class="mt-3" />
+
+                    <MudNumericField Label="Latitude" HelperText="Enter the latitude coordinate"
+                                     @bind-Value="goodWork.Latitude" For="@(() => goodWork.Latitude)" Class="mt-3" />
+
+                    <MudNumericField Label="Longitude" HelperText="Enter the longitude coordinate"
+                                     @bind-Value="goodWork.Longitude" For="@(() => goodWork.Longitude)" Class="mt-3" />
+                    <MudDatePicker Label="Start Time" Editable="true" @bind-Date="goodWork.StartTime"  />
+                    <MudDatePicker Label="EndTime" Editable="true" @bind-Date="goodWork.EndTime"  />
+                    <MudTextField Label="Contact Name" @bind-Value="goodWork.ContactName"
+                                  For="@(() => goodWork.ContactName)" Class="mt-3" />
+                    <MudTextField Label="Contact Email" @bind-Value="goodWork.ContactEmail"
+                                  For="@(() => goodWork.ContactEmail)" Class="mt-3" />
+                    <MudTextField Label="Contact Phone" @bind-Value="goodWork.ContactPhone"
+                                  For="@(() => goodWork.ContactPhone)" Class="mt-3" />
+
+                    @*                     <MudSelect Label="Effort Level" @bind-Value="goodWork.EffortLevel" Class="mt-3">
+                        <MudSelectItem Value="Light">Light</MudSelectItem>
+                        <MudSelectItem Value="Moderate">Moderate</MudSelectItem>
+                        <MudSelectItem Value="Heavy">Heavy</MudSelectItem>
+                    </MudSelect> *@
+
+                    @*                     <MudCheckBox Label="Is Accessible" @bind-Checked="goodWork.IsAccessible" Class="mt-3"/>
+                    <MudCheckBox Label="Is Virtual" @bind-Checked="goodWork.IsVirtual" Class="mt-3"/> *@
+                    <!-- Validation Summary Section -->
+
+                    @if (success)
+                    {
+                        <MudText Color="Color.Success">Good work successfully added!</MudText>
+                    }
+                    else
+                    {
+                        <MudText Color="@Color.Error">
+                            <ValidationSummary />
+                        </MudText>
+                    }
+
+                </MudCardContent>
+
+                <MudCardActions>
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">
+                        Create Good Work
+                    </MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+
+
+
+    </MudGrid>
+</EditForm>
+
+@code {
+    private GoodWorksModel goodWork = new GoodWorksModel();
+    private bool success;
+
+    private async Task OnValidSubmit()
+    {
+        await Neo4jService.CreateGoodWorkAsync(goodWork);
+        success = true;
+        goodWork = new GoodWorksModel(); // Reset form
+    }
+}
