@@ -82,13 +82,26 @@
             </ToolBarContent>
 
             <Columns>
+                <HierarchyColumn T="GoodWorksModel" />
+
                 <PropertyColumn Property="x => x.Name" Title="Name" />
                 <PropertyColumn Property="x => x.Category" Title="Category" />
                 <PropertyColumn Property="x => x.EffortLevel" Title="Effort Level" />
                 <PropertyColumn Property="x => x.ContactName" Title="Contact" />
                 <PropertyColumn Property="x => x.ContactEmail" Title="Email" />
             </Columns>
-
+            <ChildRowContent>
+                <MudCard>
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">@context.Item.Name</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText>@context.Item.Description</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </ChildRowContent>
             <PagerContent>
                 <MudDataGridPager T="GoodWorksModel" />
             </PagerContent>
