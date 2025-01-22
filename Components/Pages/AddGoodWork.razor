@@ -3,6 +3,9 @@
 @using CharityRabbit.Data
 @using CharityRabbit.Models
 @using MLS.Api.Services
+@using GoogleMapsComponents
+@using GoogleMapsComponents.Maps
+@using MudBlazor
 
 @inject Neo4jService _neo4jService
 @inject GooglePlacesService _googlePlacesService
@@ -12,7 +15,7 @@
     <DataAnnotationsValidator />
     <MudGrid>
         <!-- Form Section -->
-        <MudItem xs="12" sm="7">
+        <MudItem xs="12" sm="5">
             <MudCard>
                 <MudCardContent>
                     <MudTextField Label="Name" HelperText="Enter the project name"
@@ -23,13 +26,6 @@
 
                     <MudTextField Label="Description" HelperText="Describe the good work" Lines="3"
                                   @bind-Value="goodWork.Description" For="@(() => goodWork.Description)" Class="mt-3" />
-
-@*                     <MudNumericField Label="Latitude" HelperText="Enter the latitude coordinate"
-                                     @bind-Value="goodWork.Latitude" For="@(() => goodWork.Latitude)" Class="mt-3" />
-
-                    <MudNumericField Label="Longitude" HelperText="Enter the longitude coordinate"
-                                     @bind-Value="goodWork.Longitude" For="@(() => goodWork.Longitude)" Class="mt-3" /> *@
-
 
                     <MudAutocomplete T="string"
                                      Label="Address"
@@ -42,9 +38,23 @@
                                      ValueChanged="OnAddressChanged"
                                      Placeholder="Enter an address..." />
 
+                    <!-- Date Pickers -->
+                    <MudDatePicker Label="Start Date"
+                                   Editable="true"
+                                   @bind-Date="goodWork.StartTime" />
 
-                    <MudDatePicker Label="Start Time" Editable="true" @bind-Date="goodWork.StartTime"  />
-                    <MudDatePicker Label="EndTime" Editable="true" @bind-Date="goodWork.EndTime"  />
+                    <MudTimePicker Label="Start Time" InputIcon="Icons.Material.Filled.AccessTime"
+                                   AmPm="true" @bind-Time="_startTime" />
+
+
+                    <MudDatePicker Label="End Date"
+                                   Editable="true"
+                                   @bind-Date="goodWork.EndTime" />
+
+                    <MudTimePicker Label="End Time"
+                                   InputIcon="Icons.Material.Filled.AccessTime"
+                                   AmPm="true" @bind-Time="_endTime" />
+
                     <MudTextField Label="Contact Name" @bind-Value="goodWork.ContactName"
                                   For="@(() => goodWork.ContactName)" Class="mt-3" />
                     <MudTextField Label="Contact Email" @bind-Value="goodWork.ContactEmail"
@@ -52,15 +62,11 @@
                     <MudTextField Label="Contact Phone" @bind-Value="goodWork.ContactPhone"
                                   For="@(() => goodWork.ContactPhone)" Class="mt-3" />
 
-                    @*                     <MudSelect Label="Effort Level" @bind-Value="goodWork.EffortLevel" Class="mt-3">
-                        <MudSelectItem Value="Light">Light</MudSelectItem>
-                        <MudSelectItem Value="Moderate">Moderate</MudSelectItem>
-                        <MudSelectItem Value="Heavy">Heavy</MudSelectItem>
-                    </MudSelect> *@
-
-                    @*                     <MudCheckBox Label="Is Accessible" @bind-Checked="goodWork.IsAccessible" Class="mt-3"/>
-                    <MudCheckBox Label="Is Virtual" @bind-Checked="goodWork.IsVirtual" Class="mt-3"/> *@
-                    <!-- Validation Summary Section -->
+                    <MudSelect Label="Effort Level" @bind-Value="goodWork.EffortLevel" Class="mt-3">
+                        <MudSelectItem Value=@("Light") >Light</MudSelectItem>
+                        <MudSelectItem Value=@("Moderate")>Moderate</MudSelectItem>
+                        <MudSelectItem Value=@("Heavy")>Heavy</MudSelectItem>
+                    </MudSelect>
 
                     @if (success)
                     {
@@ -72,7 +78,6 @@
                             <ValidationSummary />
                         </MudText>
                     }
-
                 </MudCardContent>
 
                 <MudCardActions>
@@ -83,36 +88,125 @@
             </MudCard>
         </MudItem>
 
-
-
+        <!-- Map Section -->
+        <MudItem xs="12" sm="7">
+            <MudPaper Elevation="4" Class="pa-4">
+                <MudText Typo="Typo.h5" Class="mb-2">Location Map</MudText>
+                <GoogleMap @ref="_map" Options="@_mapOptions" Height="600px" OnAfterInit="InitializeMap">
+                </GoogleMap>
+            </MudPaper>
+        </MudItem>
     </MudGrid>
 </EditForm>
+
+<style>
+    .fab-refresh {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+    }
+</style>
 
 @code {
     private GoodWorksModel goodWork = new GoodWorksModel();
     private bool success;
+    private GoogleMap _map;
+    private MapOptions _mapOptions;
+    private Marker _marker;
 
+    private TimeSpan? _startTime = new TimeSpan(1, 0, 0);
+    private TimeSpan? _endTime = new TimeSpan(1, 0, 0);
+
+    protected override void OnInitialized()
+    {
+        _mapOptions = new MapOptions
+            {
+                Zoom = 10,
+                Center = new LatLngLiteral { Lat = 34.7304, Lng = -86.5861 }, // Default location
+                MapTypeId = MapTypeId.Roadmap
+            };
+    }
 
     private async Task<IEnumerable<string>> SearchAddresses(string value, CancellationToken cancellationToken)
     {
-       return await _googlePlacesService.GetAddressSuggestionsAsync(value);
+        return await _googlePlacesService.GetAddressSuggestionsAsync(value);
     }
 
     private async Task OnAddressChanged(string address)
     {
-        if (goodWork != null)
+        if (string.IsNullOrEmpty(address)) return;
+
+        var (latitude, longitude) = await _geoCodingServices.GetCoordinatesAsync(address);
+
+        goodWork.Address = address;
+        goodWork.Latitude = latitude;
+        goodWork.Longitude = longitude;
+
+        // Drop a pin on the map at the selected location
+        await UpdateMapLocation(latitude, longitude);
+    }
+
+    private async Task InitializeMap()
+    {
+        if (goodWork.Latitude != 0 && goodWork.Longitude != 0)
         {
-            goodWork.Address = address;
-            var (latitude, longitude) = await _geoCodingServices.GetCoordinatesAsync(address);
-            goodWork.Latitude = latitude;
-            goodWork.Longitude = longitude;         
+            await UpdateMapLocation(goodWork.Latitude, goodWork.Longitude);
         }
     }
 
+    private async Task UpdateMapLocation(double latitude, double longitude)
+    {
+        var position = new LatLngLiteral { Lat = latitude, Lng = longitude };
+
+        // Center the map on the new location
+        await _map.InteropObject.SetCenter(position);
+
+        // Remove the previous marker if it exists
+        if (_marker != null)
+        {
+            await _marker.SetMap(null);
+        }
+
+        // Add new marker at the selected location
+        _marker = await Marker.CreateAsync(_map.JsRuntime, new MarkerOptions
+            {
+                Position = position,
+                Map = _map.InteropObject,
+                Title = "Selected Location"
+            });
+    }
+
+
+
     private async Task OnValidSubmit()
     {
+
+        if (goodWork.StartTime.HasValue)
+        {
+            goodWork.StartTime = goodWork.StartTime.Value.Date.Add(_startTime.Value);
+        }
+        else
+        {
+            goodWork.StartTime = DateTime.Today.Add(_startTime.Value); // Default to today if not set
+        }
+
+        if (goodWork.EndTime.HasValue)
+        {
+            goodWork.EndTime = goodWork.EndTime.Value.Date.Add(_endTime.Value);
+        }
+        else
+        {
+            goodWork.EndTime = DateTime.Today.Add(_endTime.Value); // Default to today if not set
+        }
+
         await _neo4jService.CreateGoodWorkAsync(goodWork);
         success = true;
         goodWork = new GoodWorksModel(); // Reset form
+
+        if (_marker != null)
+        {
+            await _marker.SetMap(null); // Remove pin after successful submission
+        }
     }
 }
