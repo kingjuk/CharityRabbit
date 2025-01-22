@@ -10,10 +10,12 @@
 
   <ItemGroup>
     <PackageReference Include="BlazorGoogleMaps" Version="4.9.2" />
+    <PackageReference Include="GoogleApi" Version="5.7.5" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="9.0.1" />
     <PackageReference Include="MudBlazor" Version="8.*" />
     <PackageReference Include="Extensions.MudBlazor.StaticInput" Version="3.*" />
     <PackageReference Include="Neo4j.Driver" Version="5.27.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
 </Project>

@@ -1,18 +1,19 @@
 ﻿using CharityRabbit.Data;
 using CharityRabbit.Models;
+using MLS.Api.Services;
 using Neo4j.Driver;
 
 public class Neo4jService : IDisposable
 {
     private readonly IDriver _driver;
-    private readonly LocationServices _locationServices;
+    private readonly GeocodingService _locationServices;
 
-    public Neo4jService(IDriver driver, LocationServices locationServices)
+    public Neo4jService(IDriver driver, GeocodingService locationServices)
     {
         _driver = driver;
         _locationServices = locationServices;
     }
-    public Neo4jService(string uri, string username, string password, LocationServices locationServices)
+    public Neo4jService(string uri, string username, string password, GeocodingService locationServices)
     {
         _driver = GraphDatabase.Driver(uri, AuthTokens.Basic(username, password));
         _locationServices = locationServices;
@@ -20,7 +21,7 @@ public class Neo4jService : IDisposable
 
     public async Task CreateGoodWorkAsync(GoodWorksModel goodWork)
     {
-
+        //var (lat,lon) = await _locationServices.GetCoordinatesAsync(goodWork.Address);
         var (city, state, country, zip) = await _locationServices.GetLocationDetailsAsync(goodWork.Latitude, goodWork.Longitude);
 
         var query = @"

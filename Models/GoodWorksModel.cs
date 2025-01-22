@@ -19,6 +19,8 @@ namespace CharityRabbit.Models
         [Range(-180, 180, ErrorMessage = "Longitude must be between -180 and 180.")]
         public double Longitude { get; set; }
 
+        public string? Address { get; set; }
+
         public DateTime? StartTime { get; set; }
         public DateTime? EndTime { get; set; }
 

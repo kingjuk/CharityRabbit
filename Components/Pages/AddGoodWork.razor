@@ -2,7 +2,11 @@
 @using System.ComponentModel.DataAnnotations
 @using CharityRabbit.Data
 @using CharityRabbit.Models
-@inject Neo4jService Neo4jService
+@using MLS.Api.Services
+
+@inject Neo4jService _neo4jService
+@inject GooglePlacesService _googlePlacesService
+@inject GeocodingService _geoCodingServices
 
 <EditForm Model="@goodWork" OnValidSubmit="OnValidSubmit" FormName="AddGoodWorkForm">
     <DataAnnotationsValidator />
@@ -20,11 +24,25 @@
                     <MudTextField Label="Description" HelperText="Describe the good work" Lines="3"
                                   @bind-Value="goodWork.Description" For="@(() => goodWork.Description)" Class="mt-3" />
 
-                    <MudNumericField Label="Latitude" HelperText="Enter the latitude coordinate"
+@*                     <MudNumericField Label="Latitude" HelperText="Enter the latitude coordinate"
                                      @bind-Value="goodWork.Latitude" For="@(() => goodWork.Latitude)" Class="mt-3" />
 
                     <MudNumericField Label="Longitude" HelperText="Enter the longitude coordinate"
-                                     @bind-Value="goodWork.Longitude" For="@(() => goodWork.Longitude)" Class="mt-3" />
+                                     @bind-Value="goodWork.Longitude" For="@(() => goodWork.Longitude)" Class="mt-3" /> *@
+
+
+                    <MudAutocomplete T="string"
+                                     Label="Address"
+                                     Value="@goodWork.Address"
+                                     OnInputValueChanged="OnAddressChanged"
+                                     SearchFunc="SearchAddresses"
+                                     Clearable="true"
+                                     Dense="true"
+                                     Variant="Variant.Outlined"
+                                     ValueChanged="OnAddressChanged"
+                                     Placeholder="Enter an address..." />
+
+
                     <MudDatePicker Label="Start Time" Editable="true" @bind-Date="goodWork.StartTime"  />
                     <MudDatePicker Label="EndTime" Editable="true" @bind-Date="goodWork.EndTime"  />
                     <MudTextField Label="Contact Name" @bind-Value="goodWork.ContactName"
@@ -74,9 +92,26 @@
     private GoodWorksModel goodWork = new GoodWorksModel();
     private bool success;
 
+
+    private async Task<IEnumerable<string>> SearchAddresses(string value, CancellationToken cancellationToken)
+    {
+       return await _googlePlacesService.GetAddressSuggestionsAsync(value);
+    }
+
+    private async Task OnAddressChanged(string address)
+    {
+        if (goodWork != null)
+        {
+            goodWork.Address = address;
+            var (latitude, longitude) = await _geoCodingServices.GetCoordinatesAsync(address);
+            goodWork.Latitude = latitude;
+            goodWork.Longitude = longitude;         
+        }
+    }
+
     private async Task OnValidSubmit()
     {
-        await Neo4jService.CreateGoodWorkAsync(goodWork);
+        await _neo4jService.CreateGoodWorkAsync(goodWork);
         success = true;
         goodWork = new GoodWorksModel(); // Reset form
     }

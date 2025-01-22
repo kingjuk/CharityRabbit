@@ -5,6 +5,8 @@ using CharityRabbit.Components.Account;
 using CharityRabbit.Data;
 using Microsoft.Extensions.Options;
 using GoogleMapsComponents;
+using MLS.Api.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 internal class Program
 {
@@ -27,11 +29,12 @@ internal class Program
         builder.Services.AddSingleton<Neo4jService>(sp =>
         {
             var neo4jSettings = sp.GetRequiredService<IOptions<Neo4jSettings>>().Value;
-            var locationServices = sp.GetRequiredService<LocationServices>();
+            var locationServices = sp.GetRequiredService<GeocodingService>();
             return new Neo4jService(neo4jSettings.Uri, neo4jSettings.Username, neo4jSettings.Password, locationServices);
         });
 
-        builder.Services.AddHttpClient<LocationServices>();
+        builder.Services.AddHttpClient<GeocodingService>();
+        builder.Services.AddSingleton<GooglePlacesService>();
 
 
         var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"];

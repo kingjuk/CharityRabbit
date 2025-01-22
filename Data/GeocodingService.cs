@@ -1,22 +1,53 @@
-﻿using System.Text.Json;
-using Microsoft.Extensions.Configuration;
+﻿using Newtonsoft.Json.Linq;
+using System.Net.Http;
+using System.Text.Json;
 
-namespace CharityRabbit.Data
+namespace MLS.Api.Services
 {
-    public class LocationServices
+    public class GeocodingService
     {
+        private readonly string _apiKey;
         private readonly HttpClient _httpClient;
-        private readonly string _googleApiKey;
 
-        public LocationServices(HttpClient httpClient, IConfiguration configuration)
+        public GeocodingService(IConfiguration configuration, HttpClient httpClient)
         {
+            _apiKey = configuration["GoogleMaps:ApiKey"] ?? throw new ArgumentNullException("Google API key not configured."); ;
             _httpClient = httpClient;
-            _googleApiKey = configuration["GoogleMaps:ApiKey"] ?? throw new ArgumentNullException("Google API key not configured.");
+        }
+
+        public async Task<(double Latitude, double Longitude)> GetCoordinatesAsync(string address)
+        {
+            string url = $"https://maps.googleapis.com/maps/api/geocode/json?address={Uri.EscapeDataString(address)}&key={_apiKey}";
+
+            using HttpClient client = new HttpClient();
+            HttpResponseMessage response = await client.GetAsync(url);
+
+            if (response.IsSuccessStatusCode)
+            {
+                string jsonResponse = await response.Content.ReadAsStringAsync();
+                JObject json = JObject.Parse(jsonResponse);
+
+                if (json["status"]?.ToString() == "OK")
+                {
+                    var location = json["results"][0]["geometry"]["location"];
+                    double lat = (double)location["lat"];
+                    double lng = (double)location["lng"];
+                    return (lat, lng);
+                }
+                else
+                {
+                    throw new Exception("Unable to geocode the address. Status: " + json["status"]);
+                }
+            }
+            else
+            {
+                throw new HttpRequestException($"Request failed with status code {response.StatusCode}");
+            }
         }
 
         public async Task<(string city, string state, string country, string zip)> GetLocationDetailsAsync(double lat, double lng)
         {
-            var url = $"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={_googleApiKey}";
+            var url = $"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={_apiKey}";
             var response = await _httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)
