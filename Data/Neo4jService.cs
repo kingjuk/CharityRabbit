@@ -99,6 +99,8 @@ public class Neo4jService : IDisposable
         return goodWorks;
     }
 
+
+
     public async Task<List<GoodWorksModel>> GetGoodWorksByZipAsync(string zip)
     {
         var query = @"
@@ -148,6 +150,85 @@ public class Neo4jService : IDisposable
 
         return goodWorks;
     }
+    public async Task<List<GoodWorksModel>> GetAllGoodWorksWithRelationshipsAsync()
+    {
+        var query = @"
+        MATCH (g:GoodWork)-[r]-(n)
+        RETURN id(g) AS Id, 
+               g.name AS Name, 
+               g.description AS Description, 
+               g.category AS Category,
+               g.latitude AS Latitude, 
+               g.longitude AS Longitude, 
+               g.startTime AS StartTime, 
+               g.endTime AS EndTime, 
+               g.effortLevel AS EffortLevel, 
+               g.isAccessible AS IsAccessible, 
+               g.estimatedDuration AS EstimatedDuration, 
+               g.isVirtual AS IsVirtual, 
+               g.address AS Address,
+               n AS RelatedNode, 
+               type(r) AS RelationshipType";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query);
+
+        var goodWorksDictionary = new Dictionary<long, GoodWorksModel>();
+
+        await result.ForEachAsync(record =>
+        {
+            var id = record["Id"].As<long>();
+
+            if (!goodWorksDictionary.TryGetValue(id, out var goodWork))
+            {
+                goodWork = new GoodWorksModel
+                {
+                    Name = record["Name"].As<string>(),
+                    Description = record["Description"].As<string>(),
+                    Category = record["Category"].As<string>(),
+                    Latitude = record["Latitude"].As<double>(),
+                    Longitude = record["Longitude"].As<double>(),
+                    Address = record["Address"].As<string>(),
+                    StartTime = record["StartTime"].As<ZonedDateTime?>()?.ToDateTimeOffset().DateTime,
+                    EndTime = record["EndTime"].As<ZonedDateTime?>()?.ToDateTimeOffset().DateTime,
+                    EstimatedDuration = record["EstimatedDuration"].As<double?>() != null
+                                        ? TimeSpan.FromMinutes(record["EstimatedDuration"].As<double>())
+                                        : null,
+                    EffortLevel = record["EffortLevel"].As<string>(),
+                    IsAccessible = record["IsAccessible"].As<bool>(),
+                    IsVirtual = record["IsVirtual"].As<bool>(),
+                    ContactName = string.Empty,
+                    ContactEmail = string.Empty,
+                    ContactPhone = string.Empty
+                };
+                goodWorksDictionary[id] = goodWork;
+            }
+
+            // Handle relationships
+            var relationshipType = record["RelationshipType"].As<string>();
+            var relatedNode = record["RelatedNode"].As<INode>();
+
+            switch (relationshipType)
+            {
+                case "HAS_CONTACT":
+                    goodWork.ContactName = relatedNode["name"].As<string>();
+                    goodWork.ContactEmail = relatedNode["email"].As<string>();
+                    goodWork.ContactPhone = relatedNode["phone"].As<string>();
+                    break;
+                case "LOCATED_IN":
+                    goodWork.Address = $"{relatedNode["city"].As<string>()}, {relatedNode["state"].As<string>()}, {relatedNode["country"].As<string>()}, {relatedNode["zip"].As<string>()}";
+                    break;
+                case "BELONGS_TO":
+                    goodWork.Category = relatedNode["name"].As<string>();
+                    break;
+            }
+        });
+
+        return goodWorksDictionary.Values.ToList();
+    }
+
+
+
     public async Task<List<GoodWorksModel>> GetGoodWorksInBoundsAsync(double minLat, double maxLat, double minLng, double maxLng)
     {
         var query = @"

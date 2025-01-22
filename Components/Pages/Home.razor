@@ -1,56 +1,134 @@
 ﻿@page "/"
+@using CharityRabbit.Models
 
 <PageTitle>Charity Rabbit</PageTitle>
+
+@inject Neo4jService _neo4jService
+
 <MudContainer MaxWidth="MaxWidth.Medium" Class="pa-4 mt-4">
     <MudPaper Elevation="4" Class="pa-4 text-center">
+        <MudCarousel Class="mud-width-full" Style="height:180px;" TData="object">
+            <MudCarouselItem>
+                <MudCard Class="mb-3">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Ephesians 2:10 (NIV)</MudText>
+                        <MudText Typo="Typo.body1">
+                            "For we are God’s handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do."
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <MudCard Class="mb-3">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Galatians 6:9 (NIV)</MudText>
+                        <MudText Typo="Typo.body1">
+                            "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up."
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <MudCard Class="mb-3">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Matthew 5:16 (NIV)</MudText>
+                        <MudText Typo="Typo.body1">
+                            "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven."
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
 
-        <MudCard Class="mb-3">
-            <MudCardContent>
-                <MudText Typo="Typo.h6">Ephesians 2:10 (NIV)</MudText>
-                <MudText Typo="Typo.body1">
-                    "For we are God’s handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do."
-                </MudText>
-            </MudCardContent>
-        </MudCard>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <MudCard Class="mb-3">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Hebrews 10:24 (NIV)</MudText>
+                        <MudText Typo="Typo.body1">
+                            "And let us consider how we may spur one another on toward love and good deeds."
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <MudCard Class="mb-3">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">Hebrews 10:24 (NIV)</MudText>
+                        <MudText Typo="Typo.body1">
+                            "And let us consider how we may spur one another on toward love and good deeds."
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
 
-        <MudCard Class="mb-3">
-            <MudCardContent>
-                <MudText Typo="Typo.h6">Galatians 6:9 (NIV)</MudText>
-                <MudText Typo="Typo.body1">
-                    "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up."
-                </MudText>
-            </MudCardContent>
-        </MudCard>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <MudCard Class="mb-3">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6">James 2:17 (NIV)</MudText>
+                        <MudText Typo="Typo.body1">
+                            "In the same way, faith by itself, if it is not accompanied by action, is dead."
+                        </MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudCarouselItem>
+        </MudCarousel>
 
-        <MudCard Class="mb-3">
-            <MudCardContent>
-                <MudText Typo="Typo.h6">Matthew 5:16 (NIV)</MudText>
-                <MudText Typo="Typo.body1">
-                    "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven."
-                </MudText>
-            </MudCardContent>
-        </MudCard>
+        <MudDataGrid @ref="dataGrid" T="GoodWorksModel" ServerData="ServerReload" Filterable="false" Dense="true">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Nearby Good Works</MudText>
+                <MudSpacer />
+                <MudTextField T="string" ValueChanged="@(s => OnSearch(s))" Placeholder="Search by Name or Category"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              IconSize="Size.Medium" Class="mt-0" />
+            </ToolBarContent>
 
-        <MudCard Class="mb-3">
-            <MudCardContent>
-                <MudText Typo="Typo.h6">Hebrews 10:24 (NIV)</MudText>
-                <MudText Typo="Typo.body1">
-                    "And let us consider how we may spur one another on toward love and good deeds."
-                </MudText>
-            </MudCardContent>
-        </MudCard>
+            <Columns>
+                <PropertyColumn Property="x => x.Name" Title="Name" />
+                <PropertyColumn Property="x => x.Category" Title="Category" />
+                <PropertyColumn Property="x => x.EffortLevel" Title="Effort Level" />
+                <PropertyColumn Property="x => x.ContactName" Title="Contact" />
+                <PropertyColumn Property="x => x.ContactEmail" Title="Email" />
+            </Columns>
 
-        <MudCard Class="mb-3">
-            <MudCardContent>
-                <MudText Typo="Typo.h6">James 2:17 (NIV)</MudText>
-                <MudText Typo="Typo.body1">
-                    "In the same way, faith by itself, if it is not accompanied by action, is dead."
-                </MudText>
-            </MudCardContent>
-        </MudCard>
-
-        <MudDivider Class="my-4" />
-
-
+            <PagerContent>
+                <MudDataGridPager T="GoodWorksModel" />
+            </PagerContent>
+        </MudDataGrid>
     </MudPaper>
 </MudContainer>
+
+
+@code {
+
+    MudDataGrid<GoodWorksModel> dataGrid;
+    private string searchString = string.Empty;
+    private double userLatitude = 0;
+    private double userLongitude = 0;
+
+    private async Task<GridData<GoodWorksModel>> ServerReload(GridState<GoodWorksModel> state)
+    {
+        var sortField = state.SortDefinitions.FirstOrDefault()?.SortBy ?? "Name";
+        var sortDescending = state.SortDefinitions.FirstOrDefault()?.Descending ?? false;
+
+        var goodWorks = await _neo4jService.GetAllGoodWorksWithRelationshipsAsync();
+
+        return new GridData<GoodWorksModel>
+            {
+                TotalItems = goodWorks.Count,
+                Items = goodWorks
+            };
+    }
+
+    private Task OnSearch(string text)
+    {
+        searchString = text;
+        return dataGrid.ReloadServerData();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (dataGrid != null)
+        {
+            await dataGrid.ReloadServerData();
+        }
+    }
+}
