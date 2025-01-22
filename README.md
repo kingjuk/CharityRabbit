@@ -1,6 +1,8 @@
 # CharityRabbit
 CharityRabbit is an open source platfrom for posting and finding Good works to do around you
 
+hosted at [CharityRabbit](https://charityrabbit.com/)
+
 ## GoodWorks Graph Schema
 
 This document provides an overview of the Neo4j graph database schema for the GoodWorks application. It defines each node type and its properties, as well as the relationships between them.

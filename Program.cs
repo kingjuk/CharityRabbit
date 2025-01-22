@@ -106,6 +106,13 @@ internal class Program
 
         app.UseAntiforgery();
 
+        //force scheme to https so redirect to login works
+        app.Use((context, next) =>
+        {
+            context.Request.Scheme = "https";
+            return next();
+        });
+
         app.UseAuthentication();  
         app.UseAuthorization();
 
