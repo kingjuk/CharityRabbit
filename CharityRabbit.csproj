@@ -23,4 +23,9 @@
     <None Include="wwwroot\images\charityrabbit.jpg" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <Folder Include="Auth\" />
+  </ItemGroup>
+
 </Project>

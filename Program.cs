@@ -6,15 +6,12 @@ using CharityRabbit.Data;
 using Microsoft.Extensions.Options;
 using GoogleMapsComponents;
 using MLS.Api.Services;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 internal class Program
 {
-    protected Program()
-    {
-
-    }
-
+    protected Program() { }
 
     private async static Task Main(string[] args)
     {
@@ -22,10 +19,8 @@ internal class Program
 
         builder.Services.AddHttpContextAccessor();
 
-        // Configure Neo4jSettings from appsettings.json
         builder.Services.Configure<Neo4jSettings>(builder.Configuration.GetSection("Neo4jSettings"));
 
-        // Register Neo4jService using Neo4jSettings
         builder.Services.AddSingleton<Neo4jService>(sp =>
         {
             var neo4jSettings = sp.GetRequiredService<IOptions<Neo4jSettings>>().Value;
@@ -36,42 +31,31 @@ internal class Program
         builder.Services.AddHttpClient<GeocodingService>();
         builder.Services.AddSingleton<GooglePlacesService>();
 
+        var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"] ?? throw new InvalidOperationException("GoogleMaps API key is missing in configuration.");
 
-        var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"];
+        builder.Services.AddBlazorGoogleMaps(googleMapsApiKey);
 
-        if (googleMapsApiKey == null)
-        {
-            throw new InvalidOperationException("GoogleMaps:ApiKey is not set in appsettings.json");
-        }
-        else
-        {
-            builder.Services.AddBlazorGoogleMaps(googleMapsApiKey);
-        }
-
-
-        // Add MudBlazor services
         builder.Services.AddMudServices();
 
-        // Add services to the container.
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
 
+
         builder.Services.AddCascadingAuthenticationState();
-        builder.Services.AddScoped<IdentityRedirectManager>();
         builder.Services.AddScoped<AuthenticationStateProvider, OidcAuthenticationStateProvider>();
 
         builder.Services.AddAuthentication(options =>
         {
             options.DefaultScheme = "Cookies";
-            options.DefaultChallengeScheme = "oidc";  // Set OIDC as the challenge scheme
+            options.DefaultChallengeScheme = "oidc";
         })
         .AddCookie("Cookies")
         .AddOpenIdConnect("oidc", options =>
         {
-            options.Authority = builder.Configuration["Oidc:Authority"]; // OIDC provider URL (e.g., Azure AD, Google)
-            options.ClientId = builder.Configuration["Oidc:ClientId"]; // Your client ID
-            options.ClientSecret = builder.Configuration["Oidc:ClientSecret"]; // Your client secret
-            options.ResponseType = "code";  // Authorization Code flow
+            options.Authority = builder.Configuration["Oidc:Authority"];
+            options.ClientId = builder.Configuration["Oidc:ClientId"];
+            options.ClientSecret = builder.Configuration["Oidc:ClientSecret"];
+            options.ResponseType = "code";
             options.Scope.Add("openid");
             options.Scope.Add("profile");
             options.Scope.Add("email");
@@ -79,46 +63,56 @@ internal class Program
             options.GetClaimsFromUserInfoEndpoint = true;
             options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
             {
-                NameClaimType = "name",  // Use 'name' claim instead of default 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'
+                NameClaimType = "name",
             };
         });
 
+        builder.Services.ConfigureCookieOidcRefresh(CookieAuthenticationDefaults.AuthenticationScheme, "oidc");
+
+
         builder.Services.AddAuthorization();
 
-        // builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+        builder.Services.AddCascadingAuthenticationState();
 
         var app = builder.Build();
 
-        // Configure the HTTP request pipeline.
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error", createScopeForErrors: true);
-            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
             app.UseHsts();
         }
 
         app.UseHttpsRedirection();
 
-        app.UseHttpsRedirection();
-        app.UseStaticFiles();
+        // Handle reverse proxies if needed
+        app.UseForwardedHeaders(new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.All
+        });
 
+        app.UseStaticFiles();
         app.UseRouting();
 
+        app.MapStaticAssets();
         app.UseAntiforgery();
 
-        //force scheme to https so redirect to login works
+
+        // Force HTTPS scheme to ensure correct OIDC redirects
         app.Use((context, next) =>
         {
             context.Request.Scheme = "https";
             return next();
         });
 
-        app.UseAuthentication();  
+        app.UseAuthentication();
         app.UseAuthorization();
 
         app.MapStaticAssets();
         app.MapRazorComponents<App>()
             .AddInteractiveServerRenderMode();
+
+        app.MapGroup("/authentication").MapLoginAndLogout();
+
 
         await app.RunAsync();
     }
