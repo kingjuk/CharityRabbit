@@ -72,7 +72,7 @@
             </MudCarouselItem>
         </MudCarousel>
 
-        <MudDataGrid @ref="dataGrid" T="GoodWorksModel" ServerData="ServerReload" Filterable="false" Dense="true">
+        <MudDataGrid @ref="dataGrid" T="GoodWorksModel" ServerData="ServerReload" Filterable="true" Dense="true">
             <ToolBarContent>
                 <MudText Typo="Typo.h6">Nearby Good Works</MudText>
                 <MudSpacer />
@@ -84,11 +84,13 @@
             <Columns>
                 <HierarchyColumn T="GoodWorksModel" />
 
-                <PropertyColumn Property="x => x.Name" Title="Name" />
-                <PropertyColumn Property="x => x.Category" Title="Category" />
-                <PropertyColumn Property="x => x.EffortLevel" Title="Effort Level" />
-                <PropertyColumn Property="x => x.ContactName" Title="Contact" />
-                <PropertyColumn Property="x => x.ContactEmail" Title="Email" />
+                <PropertyColumn Property="x => x.Name" Title="Name" Filterable="true" />
+                <PropertyColumn Property="x => x.Category" Title="Category" Filterable="true" />
+                <PropertyColumn Property="x => x.EffortLevel" Title="Effort Level" Filterable="true" />
+                <PropertyColumn Property="x => x.ContactName" Title="Contact" Filterable="true" />
+                <PropertyColumn Property="x => x.ContactEmail" Title="Email" Filterable="true" />
+                <PropertyColumn Property="x => x.StartTime" Title="Start Time" Filterable="true" />
+                <PropertyColumn Property="x => x.EndTime" Title="End Time" Filterable="true" />
             </Columns>
             <ChildRowContent>
                 <MudCard>
