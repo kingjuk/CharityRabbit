@@ -144,4 +144,9 @@
             await dataGrid.ReloadServerData();
         }
     }
+
+    private void OnRowDoubleClick(GoodWorksModel item)
+    {
+        Navigation.NavigateTo($"/goodworksdetails/{item.Name}");
+    }
 }

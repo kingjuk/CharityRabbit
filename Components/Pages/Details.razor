@@ -1,0 +1,46 @@
+﻿@page "/details/{id}"
+
+@inject NavigationManager Navigation
+@inject HttpClient Http
+
+@code {
+    [Parameter] public string Id { get; set; }
+    private GoodWorksModel? goodWork;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            goodWork = await Http.GetFromJsonAsync<GoodWorksModel>($"api/goodworks/{Id}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching data: {ex.Message}");
+        }
+    }
+}
+
+@if (goodWork == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div>
+        <h2>@goodWork.Name</h2>
+        <p><strong>Category:</strong> @goodWork.Category</p>
+        <p><strong>Description:</strong> @goodWork.Description</p>
+        <p><strong>Location:</strong> @goodWork.Address</p>
+        <p><strong>Effort Level:</strong> @goodWork.EffortLevel</p>
+        <p><strong>Accessible:</strong> @(goodWork.IsAccessible ? "Yes" : "No")</p>
+        <p><strong>Virtual:</strong> @(goodWork.IsVirtual ? "Yes" : "No")</p>
+        <p><strong>Start Time:</strong> @goodWork.StartTime?.ToString("g")</p>
+        <p><strong>End Time:</strong> @goodWork.EndTime?.ToString("g")</p>
+        <p><strong>Estimated Duration:</strong> @goodWork.EstimatedDuration</p>
+        <p><strong>Contact Name:</strong> @goodWork.ContactName</p>
+        <p><strong>Contact Email:</strong> @goodWork.ContactEmail</p>
+        <p><strong>Contact Phone:</strong> @goodWork.ContactPhone</p>
+    </div>
+
+    <MapView Latitude="@goodWork.Latitude" Longitude="@goodWork.Longitude" />
+}
