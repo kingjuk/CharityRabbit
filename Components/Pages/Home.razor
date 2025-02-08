@@ -5,7 +5,7 @@
 
 @inject Neo4jService _neo4jService
 
-<MudContainer MaxWidth="MaxWidth.Medium" Class="pa-4 mt-4">
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
     <MudPaper Elevation="4" Class="pa-4 text-center">
         <MudCarousel Class="mud-width-full" Style="height:180px;" TData="object">
             <MudCarouselItem>
@@ -76,34 +76,21 @@
             <ToolBarContent>
                 <MudText Typo="Typo.h6">Nearby Good Works</MudText>
                 <MudSpacer />
-                <MudTextField T="string" ValueChanged="@(s => OnSearch(s))" Placeholder="Search by Name or Category"
+                <MudTextField T="string" ValueChanged="@(s => OnGlobalSearch(s))" Placeholder="Search All Columns"
                               Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                              IconSize="Size.Medium" Class="mt-0" />
+                              IconSize="Size.Medium" Immediate="true" />
             </ToolBarContent>
 
             <Columns>
-                <HierarchyColumn T="GoodWorksModel" />
-
-                <PropertyColumn Property="x => x.Name" Title="Name" Filterable="true" />
-                <PropertyColumn Property="x => x.Category" Title="Category" Filterable="true" />
-                <PropertyColumn Property="x => x.EffortLevel" Title="Effort Level" Filterable="true" />
-                <PropertyColumn Property="x => x.ContactName" Title="Contact" Filterable="true" />
-                <PropertyColumn Property="x => x.ContactEmail" Title="Email" Filterable="true" />
-                <PropertyColumn Property="x => x.StartTime" Title="Start Time" Filterable="true" />
-                <PropertyColumn Property="x => x.EndTime" Title="End Time" Filterable="true" />
+                <PropertyColumn Property="x => x.Name" Title="Name" Filterable="false" />
+                <PropertyColumn Property="x => x.Category" Title="Category" Filterable="false" />
+                <PropertyColumn Property="x => x.EffortLevel" Title="Effort Level" Filterable="false" />
+                <PropertyColumn Property="x => x.ContactName" Title="Contact" Filterable="false" />
+                <PropertyColumn Property="x => x.ContactEmail" Title="Email" Filterable="false" />
+                <PropertyColumn Property="x => x.StartTime" Title="Start Time" Filterable="false" />
+                <PropertyColumn Property="x => x.EndTime" Title="End Time" Filterable="false" />
             </Columns>
-            <ChildRowContent>
-                <MudCard>
-                    <MudCardHeader>
-                        <CardHeaderContent>
-                            <MudText Typo="Typo.h6">@context.Item.Name</MudText>
-                        </CardHeaderContent>
-                    </MudCardHeader>
-                    <MudCardContent>
-                        <MudText>@context.Item.Description</MudText>
-                    </MudCardContent>
-                </MudCard>
-            </ChildRowContent>
+
             <PagerContent>
                 <MudDataGridPager T="GoodWorksModel" />
             </PagerContent>
@@ -111,20 +98,59 @@
     </MudPaper>
 </MudContainer>
 
-
 @code {
-
     MudDataGrid<GoodWorksModel> dataGrid;
-    private string searchString = string.Empty;
-    private double userLatitude = 0;
-    private double userLongitude = 0;
+    private string globalSearchString = string.Empty;
 
     private async Task<GridData<GoodWorksModel>> ServerReload(GridState<GoodWorksModel> state)
     {
-        var sortField = state.SortDefinitions.FirstOrDefault()?.SortBy ?? "Name";
-        var sortDescending = state.SortDefinitions.FirstOrDefault()?.Descending ?? false;
-
         var goodWorks = await _neo4jService.GetAllGoodWorksWithRelationshipsAsync();
+
+        // Global Search
+        if (!string.IsNullOrWhiteSpace(globalSearchString))
+        {
+            goodWorks = goodWorks.Where(g =>
+                (g.Name?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (g.Category?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (g.EffortLevel?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (g.ContactName?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (g.ContactEmail?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (g.StartTime.ToString()?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (g.EndTime.ToString()?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false)
+            ).ToList();
+        }
+
+        // Sorting
+        if (state.SortDefinitions.Any())
+        {
+            var sortDefinition = state.SortDefinitions.First();
+            var sortField = sortDefinition.SortBy;
+            goodWorks = sortField switch
+            {
+                "Name" => sortDefinition.Descending
+                    ? goodWorks.OrderByDescending(g => g.Name).ToList()
+                    : goodWorks.OrderBy(g => g.Name).ToList(),
+                "Category" => sortDefinition.Descending
+                    ? goodWorks.OrderByDescending(g => g.Category).ToList()
+                    : goodWorks.OrderBy(g => g.Category).ToList(),
+                "EffortLevel" => sortDefinition.Descending
+                    ? goodWorks.OrderByDescending(g => g.EffortLevel).ToList()
+                    : goodWorks.OrderBy(g => g.EffortLevel).ToList(),
+                "ContactName" => sortDefinition.Descending
+                    ? goodWorks.OrderByDescending(g => g.ContactName).ToList()
+                    : goodWorks.OrderBy(g => g.ContactName).ToList(),
+                "ContactEmail" => sortDefinition.Descending
+                    ? goodWorks.OrderByDescending(g => g.ContactEmail).ToList()
+                    : goodWorks.OrderBy(g => g.ContactEmail).ToList(),
+                "StartTime" => sortDefinition.Descending
+                    ? goodWorks.OrderByDescending(g => g.StartTime).ToList()
+                    : goodWorks.OrderBy(g => g.StartTime).ToList(),
+                "EndTime" => sortDefinition.Descending
+                    ? goodWorks.OrderByDescending(g => g.EndTime).ToList()
+                    : goodWorks.OrderBy(g => g.EndTime).ToList(),
+                _ => goodWorks
+            };
+        }
 
         return new GridData<GoodWorksModel>
             {
@@ -133,17 +159,10 @@
             };
     }
 
-    private Task OnSearch(string text)
+    private Task OnGlobalSearch(string text)
     {
-        searchString = text;
+        globalSearchString = text;
         return dataGrid.ReloadServerData();
     }
-
-    protected override async Task OnInitializedAsync()
-    {
-        if (dataGrid != null)
-        {
-            await dataGrid.ReloadServerData();
-        }
-    }
 }
+
