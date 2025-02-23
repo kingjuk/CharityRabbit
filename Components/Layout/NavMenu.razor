@@ -8,10 +8,9 @@
     
     <MudNavLink Href="add-good-work" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Add Good Works</MudNavLink>
 
-    <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Lock">Auth Required</MudNavLink>
     <AuthorizeView>
         <Authorized>
-            <MudNavLink Href="Account/Manage" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">@context.User.Identity?.Name</MudNavLink>
+            <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">@context.User.Identity?.Name</MudNavLink>
             <form action="authentication/logout" method="post">
 @*                 <AntiforgeryToken />
  *@                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
