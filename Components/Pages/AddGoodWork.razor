@@ -30,8 +30,17 @@
                         <MudTextField Label="Name" HelperText="Enter the project name"
                                       @bind-Value="goodWork.Name" For="@(() => goodWork.Name)" />
 
-                        <MudTextField Label="Category" HelperText="Choose a category"
-                                      @bind-Value="goodWork.Category" For="@(() => goodWork.Category)" Class="mt-3" />
+                        <MudAutocomplete T="string"
+                                         Label="Category"
+                                         @bind-Value="goodWork.Category"
+                                         SearchFunc="SearchCategories"
+                                         Clearable="true"
+                                         Dense="false"
+                                         Variant="Variant.Outlined"
+                                         HelperText="Choose a category or enter your own"
+                                         Class="mt-3"
+                                         CoerceText="true"
+                                         CoerceValue="true" />
 
                         <MudTextField Label="Description" HelperText="Describe the good work" Lines="3"
                                       @bind-Value="goodWork.Description" For="@(() => goodWork.Description)" Class="mt-3" />
@@ -138,6 +147,20 @@
     private TimeSpan? _startTime = new TimeSpan(9, 0, 0);
     private TimeSpan? _endTime = new TimeSpan(17, 0, 0);
 
+    private readonly List<string> _predefinedCategories = new()
+    {
+        "Food Bank",
+        "Homeless Shelter",
+        "Environmental",
+        "Education",
+        "Healthcare",
+        "Animal Welfare",
+        "Community Service",
+        "Youth Programs",
+        "Senior Care",
+        "Disaster Relief"
+    };
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -162,6 +185,28 @@
     {
         if (string.IsNullOrEmpty(value)) return Array.Empty<string>();
         return await _googlePlacesService.GetAddressSuggestionsAsync(value);
+    }
+
+    private Task<IEnumerable<string>> SearchCategories(string value, CancellationToken cancellationToken)
+    {
+        // If no search value, return all predefined categories
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Task.FromResult<IEnumerable<string>>(_predefinedCategories);
+        }
+
+        // Filter categories based on search value
+        var filtered = _predefinedCategories
+            .Where(c => c.Contains(value, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        // If user is typing something not in the list, add it as an option
+        if (!filtered.Any() || !filtered.Any(c => c.Equals(value, StringComparison.OrdinalIgnoreCase)))
+        {
+            filtered.Insert(0, value);
+        }
+
+        return Task.FromResult<IEnumerable<string>>(filtered);
     }
 
     private async Task OnAddressChanged(string address)

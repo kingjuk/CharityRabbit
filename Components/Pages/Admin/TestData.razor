@@ -1,0 +1,273 @@
+@page "/admin/test-data"
+@using CharityRabbit.Models
+@using CharityRabbit.Data
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@inject TestDataService _testDataService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@attribute [Authorize]
+
+<PageTitle>Test Data Management - Charity Rabbit</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+    <MudText Typo="Typo.h3" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.Science" Class="mr-2" />
+        Test Data Management
+    </MudText>
+    
+    <MudAlert Severity="Severity.Warning" Class="mb-4">
+        <strong>Developer Tool:</strong> Use this page to import sample data for testing or delete all test data from the database.
+    </MudAlert>
+
+    <MudGrid>
+        <!-- Import Section -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="4" Class="pa-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">
+                    <MudIcon Icon="@Icons.Material.Filled.Upload" Class="mr-2" />
+                    Import Test Data
+                </MudText>
+                
+                <MudText Typo="Typo.body1" Class="mb-3">
+                    Import 100 sample Good Works from the JSON file. All imported data will be tagged as TEST_DATA for easy cleanup.
+                </MudText>
+
+                @if (previewData != null && previewData.Any())
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Info" Class="mb-3">
+                        ?? Ready to import <strong>@previewData.Count</strong> Good Works
+                    </MudText>
+                    
+                    <MudText Typo="Typo.caption" Class="mb-2">Sample categories:</MudText>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        @foreach (var category in previewData.Select(g => g.Category).Distinct().Take(5))
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">@category</MudChip>
+                        }
+                        @if (previewData.Select(g => g.Category).Distinct().Count() > 5)
+                        {
+                            <MudChip T="string" Size="Size.Small">+@(previewData.Select(g => g.Category).Distinct().Count() - 5) more</MudChip>
+                        }
+                    </div>
+                }
+
+                @if (testDataCount > 0)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                        Currently <strong>@testDataCount</strong> test records in database
+                    </MudAlert>
+                }
+
+                <MudButton Variant="Variant.Filled" 
+                         Color="Color.Primary" 
+                         StartIcon="@Icons.Material.Filled.Upload"
+                         OnClick="ImportTestData"
+                         Disabled="@isImporting"
+                         FullWidth="true">
+                    @if (isImporting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Importing...</span>
+                    }
+                    else
+                    {
+                        <span>Import Test Data</span>
+                    }
+                </MudButton>
+
+                @if (importResult != null)
+                {
+                    <MudAlert Severity="Severity.Success" Class="mt-3">
+                        Successfully imported <strong>@importResult</strong> Good Works!
+                    </MudAlert>
+                }
+
+                @if (!string.IsNullOrEmpty(importError))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-3">
+                        @importError
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Delete Section -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="4" Class="pa-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">
+                    <MudIcon Icon="@Icons.Material.Filled.DeleteSweep" Class="mr-2" />
+                    Delete Test Data
+                </MudText>
+                
+                <MudText Typo="Typo.body1" Class="mb-3">
+                    Remove all Good Works marked with the TEST_DATA tag. This will not affect any manually created Good Works.
+                </MudText>
+
+                @if (testDataCount > 0)
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                        ?? This will delete <strong>@testDataCount</strong> test records and all related data (relationships, tags, etc.)
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                        ?? No test data currently in database
+                    </MudAlert>
+                }
+
+                <MudButton Variant="Variant.Filled" 
+                         Color="Color.Error" 
+                         StartIcon="@Icons.Material.Filled.DeleteSweep"
+                         OnClick="DeleteTestData"
+                         Disabled="@(isDeleting || testDataCount == 0)"
+                         FullWidth="true">
+                    @if (isDeleting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Deleting...</span>
+                    }
+                    else
+                    {
+                        <span>Delete All Test Data</span>
+                    }
+                </MudButton>
+
+                @if (deleteResult != null)
+                {
+                    <MudAlert Severity="Severity.Success" Class="mt-3">
+                        Successfully deleted <strong>@deleteResult</strong> test records!
+                    </MudAlert>
+                }
+
+                @if (!string.IsNullOrEmpty(deleteError))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-3">
+                        @deleteError
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Info Section -->
+        <MudItem xs="12">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" GutterBottom="true">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-2" />
+                    About Test Data
+                </MudText>
+                
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • All imported Good Works are automatically tagged with <MudChip T="string" Size="Size.Small">TEST_DATA</MudChip>
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Test data includes 100 diverse volunteer opportunities across all 10 categories
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Data includes realistic details: dates, locations, contacts, effort levels, and more
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Perfect for testing search, filtering, map views, and other features
+                </MudText>
+                <MudText Typo="Typo.body2">
+                    • Deletion only affects test data - your manually created Good Works are safe
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudButton Variant="Variant.Text" 
+               StartIcon="@Icons.Material.Filled.ArrowBack" 
+               Color="Color.Default" 
+               Class="mt-4"
+               Href="/profile">
+        Back to Profile
+    </MudButton>
+</MudContainer>
+
+@code {
+    private List<GoodWorksModel>? previewData;
+    private int testDataCount = 0;
+    private bool isImporting = false;
+    private bool isDeleting = false;
+    private int? importResult;
+    private int? deleteResult;
+    private string? importError;
+    private string? deleteError;
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            previewData = await _testDataService.GetTestDataPreviewAsync();
+            testDataCount = await _testDataService.GetTestDataCountInDatabaseAsync();
+        }
+        catch (Exception ex)
+        {
+            importError = $"Error loading preview: {ex.Message}";
+        }
+    }
+
+    private async Task ImportTestData()
+    {
+        isImporting = true;
+        importResult = null;
+        importError = null;
+        StateHasChanged();
+
+        try
+        {
+            importResult = await _testDataService.ImportTestDataAsync(userId);
+            testDataCount = await _testDataService.GetTestDataCountInDatabaseAsync();
+        }
+        catch (Exception ex)
+        {
+            importError = $"Import failed: {ex.Message}";
+        }
+        finally
+        {
+            isImporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteTestData()
+    {
+        isDeleting = true;
+        deleteResult = null;
+        deleteError = null;
+        StateHasChanged();
+
+        try
+        {
+            deleteResult = await _testDataService.DeleteAllTestDataAsync();
+            testDataCount = await _testDataService.GetTestDataCountInDatabaseAsync();
+            
+            // Clear import result when deleting
+            importResult = null;
+        }
+        catch (Exception ex)
+        {
+            deleteError = $"Delete failed: {ex.Message}";
+        }
+        finally
+        {
+            isDeleting = false;
+            StateHasChanged();
+        }
+    }
+}

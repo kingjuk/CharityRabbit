@@ -1,16 +1,20 @@
 ﻿@implements IDisposable
 
 @inject NavigationManager NavigationManager
+@inject IWebHostEnvironment Environment
 
 <MudNavMenu>
     <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
     <MudNavLink Href="search" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Search">Search</MudNavLink>
-    <MudNavLink Href="map" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Map">Map</MudNavLink>
     
     <AuthorizeView>
         <Authorized>
             <MudNavLink Href="profile" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">My Profile</MudNavLink>
             <MudNavLink Href="add-good-work" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Add Good Works</MudNavLink>
+            @if (Environment.IsDevelopment())
+            {
+                <MudNavLink Href="admin/test-data" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Science">Test Data</MudNavLink>
+            }
             <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountCircle">@context.User.Identity?.Name</MudNavLink>
             <form action="authentication/logout" method="post">
                 <input type="hidden" name="ReturnUrl" value="@currentUrl" />

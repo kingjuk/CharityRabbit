@@ -1,180 +1,296 @@
 ﻿@page "/"
 @using CharityRabbit.Models
-
-<PageTitle>Charity Rabbit</PageTitle>
-
+@using System.Security.Claims
 @inject Neo4jService _neo4jService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Charity Rabbit - Make a Difference</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
-    <MudPaper Elevation="4" Class="pa-4 text-center">
-        <MudCarousel Class="mud-width-full" Style="height:180px;" TData="object">
-            <MudCarouselItem>
-                <MudCard Class="mb-3">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6">Ephesians 2:10 (NIV)</MudText>
-                        <MudText Typo="Typo.body1">
-                            "For we are God’s handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do."
-                        </MudText>
-                    </MudCardContent>
-                </MudCard>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <MudCard Class="mb-3">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6">Galatians 6:9 (NIV)</MudText>
-                        <MudText Typo="Typo.body1">
-                            "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up."
-                        </MudText>
-                    </MudCardContent>
-                </MudCard>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <MudCard Class="mb-3">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6">Matthew 5:16 (NIV)</MudText>
-                        <MudText Typo="Typo.body1">
-                            "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven."
-                        </MudText>
-                    </MudCardContent>
-                </MudCard>
+    <!-- Welcome Hero Section -->
+    <MudPaper Elevation="4" Class="pa-6 mb-4 text-center" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <MudText Typo="Typo.h6" Class="mb-4">
+            Connect with opportunities to serve your community
+        </MudText>
+        
+        @if (!isAuthenticated)
+        {
+            <MudButton Variant="Variant.Filled" 
+                     Color="Color.Secondary" 
+                     Size="Size.Large"
+                     Href="/authentication/login"
+                     StartIcon="@Icons.Material.Filled.Login">
+                Sign In to Get Started
+            </MudButton>
+        }
+    </MudPaper>
 
+    <!-- Bible Verse Carousel -->
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudCarousel Class="mud-width-full" Style="height:140px;" ShowArrows="true" ShowBullets="false" 
+                   EnableSwipeGesture="true" AutoCycle="true" TData="object">
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Ephesians 2:10 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "For we are God's handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do."
+                    </MudText>
+                </div>
             </MudCarouselItem>
             <MudCarouselItem>
-                <MudCard Class="mb-3">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6">Hebrews 10:24 (NIV)</MudText>
-                        <MudText Typo="Typo.body1">
-                            "And let us consider how we may spur one another on toward love and good deeds."
-                        </MudText>
-                    </MudCardContent>
-                </MudCard>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Galatians 6:9 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up."
+                    </MudText>
+                </div>
             </MudCarouselItem>
             <MudCarouselItem>
-                <MudCard Class="mb-3">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6">Hebrews 10:24 (NIV)</MudText>
-                        <MudText Typo="Typo.body1">
-                            "And let us consider how we may spur one another on toward love and good deeds."
-                        </MudText>
-                    </MudCardContent>
-                </MudCard>
-
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Matthew 5:16 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven."
+                    </MudText>
+                </div>
             </MudCarouselItem>
             <MudCarouselItem>
-                <MudCard Class="mb-3">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6">James 2:17 (NIV)</MudText>
-                        <MudText Typo="Typo.body1">
-                            "In the same way, faith by itself, if it is not accompanied by action, is dead."
-                        </MudText>
-                    </MudCardContent>
-                </MudCard>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Hebrews 10:24 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "And let us consider how we may spur one another on toward love and good deeds."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">James 2:17 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "In the same way, faith by itself, if it is not accompanied by action, is dead."
+                    </MudText>
+                </div>
             </MudCarouselItem>
         </MudCarousel>
+    </MudPaper>
 
-        <MudDataGrid @ref="dataGrid" T="GoodWorksModel" ServerData="ServerReload" Filterable="true" Dense="true">
-            <ToolBarContent>
-                <MudText Typo="Typo.h6">Nearby Good Works</MudText>
-                <MudSpacer />
-                <MudTextField T="string" ValueChanged="@(s => OnGlobalSearch(s))" Placeholder="Search All Columns"
-                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                              IconSize="Size.Medium" Immediate="true" />
-            </ToolBarContent>
+    @if (isAuthenticated)
+    {
+        <!-- Personalized Content for Logged In Users -->
+        
+        <!-- My Upcoming Events -->
+        @if (upcomingEvents != null && upcomingEvents.Any())
+        {
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">
+                    <MudIcon Icon="@Icons.Material.Filled.Event" Class="mr-2" />
+                    Your Upcoming Events
+                </MudText>
+                
+                <MudGrid>
+                    @foreach (var work in upcomingEvents.Take(6))
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6">@work.Name</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@work.Category</MudChip>
+                                    @if (work.IsUserSignedUp)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Signed Up</MudChip>
+                                    }
+                                    else if (work.IsUserInterested)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Star">Interested</MudChip>
+                                    }
+                                    
+                                    @if (work.StartTime.HasValue)
+                                    {
+                                        <MudText Typo="Typo.body2" Class="mt-2">
+                                            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" />
+                                            @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                        </MudText>
+                                    }
+                                    
+                                    @if (!string.IsNullOrEmpty(work.Address))
+                                    {
+                                        <MudText Typo="Typo.caption">
+                                            <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" />
+                                            @work.Address
+                                        </MudText>
+                                    }
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" 
+                                             Href="@($"/goodwork/{work.Id}")">
+                                        View Details
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
 
-            <Columns>
-                <PropertyColumn Property="x => x.Name" Title="Name" Filterable="false">
-                    <CellTemplate>
-                        <MudLink Href="@($"/goodwork/{context.Item.Id}")">@context.Item.Name</MudLink>
-                    </CellTemplate>
-                </PropertyColumn>
-                <PropertyColumn Property="x => x.Category" Title="Category" Filterable="false" />
-                <PropertyColumn Property="x => x.EffortLevel" Title="Effort Level" Filterable="false" />
-                <PropertyColumn Property="x => x.ContactName" Title="Contact" Filterable="false" />
-                <PropertyColumn Property="x => x.ContactEmail" Title="Email" Filterable="false" />
-                <PropertyColumn Property="x => x.StartTime" Title="Start Time" Filterable="false" />
-                <PropertyColumn Property="x => x.EndTime" Title="End Time" Filterable="false" />
-                <TemplateColumn Title="Actions" Filterable="false">
-                    <CellTemplate>
-                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
-                                     Color="Color.Primary" 
-                                     Size="Size.Small"
-                                     Href="@($"/goodwork/{context.Item.Id}")" />
-                    </CellTemplate>
-                </TemplateColumn>
-            </Columns>
+                @if (upcomingEvents.Count > 6)
+                {
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/profile" Class="mt-3">
+                        View All @upcomingEvents.Count Events →
+                    </MudButton>
+                }
+            </MudPaper>
+        }
 
-            <PagerContent>
-                <MudDataGridPager T="GoodWorksModel" />
-            </PagerContent>
-        </MudDataGrid>
+        <!-- Recommended for You -->
+        @if (recommendedWorks != null && recommendedWorks.Any())
+        {
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">
+                    <MudIcon Icon="@Icons.Material.Filled.Recommend" Class="mr-2" />
+                    Recommended for You
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+                    Based on your interests and what your friends are doing
+                </MudText>
+                
+                <MudGrid>
+                    @foreach (var work in recommendedWorks.Take(6))
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6">@work.Name</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@work.Category</MudChip>
+                                    
+                                    <MudText Typo="Typo.body2" Class="mt-2">
+                                        @(work.Description.Length > 100 ? work.Description.Substring(0, 100) + "..." : work.Description)
+                                    </MudText>
+                                    
+                                    @if (work.StartTime.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="mt-2">
+                                            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" />
+                                            @work.StartTime.Value.ToString("MMM dd, yyyy")
+                                        </MudText>
+                                    }
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" 
+                                             Href="@($"/goodwork/{work.Id}")">
+                                        Learn More
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        }
+    }
+    else
+    {
+        <!-- Content for Non-Authenticated Users -->
+        <MudPaper Elevation="2" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">Get Started</MudText>
+            <MudText Typo="Typo.body1" Class="mb-3">
+                Sign in to discover personalized volunteer opportunities, track your impact, and connect with others making a difference in your community.
+            </MudText>
+            
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="0" Class="pa-3 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Large" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Class="mt-2">Discover</MudText>
+                        <MudText Typo="Typo.body2">Find opportunities that match your interests</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="0" Class="pa-3 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Class="mt-2">Connect</MudText>
+                        <MudText Typo="Typo.body2">See what your friends are supporting</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="0" Class="pa-3 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Favorite" Size="Size.Large" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Class="mt-2">Impact</MudText>
+                        <MudText Typo="Typo.body2">Track your volunteer hours and impact</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Elevation="0" Class="pa-3 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Share" Size="Size.Large" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Class="mt-2">Share</MudText>
+                        <MudText Typo="Typo.body2">Inspire others to join you</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+
+    <!-- Quick Actions -->
+    <MudPaper Elevation="2" Class="pa-4">
+        <MudText Typo="Typo.h5" GutterBottom="true">Explore Opportunities</MudText>
+        <MudGrid>
+            <MudItem xs="12" sm="6" md="6">
+                <MudButton Variant="Variant.Filled" 
+                         Color="Color.Primary" 
+                         FullWidth="true"
+                         StartIcon="@Icons.Material.Filled.Search"
+                         Href="/search">
+                    Search Good Works
+                </MudButton>
+            </MudItem>
+            @if (isAuthenticated)
+            {
+                <MudItem xs="12" sm="6" md="6">
+                    <MudButton Variant="Variant.Filled" 
+                             Color="Color.Secondary" 
+                             FullWidth="true"
+                             StartIcon="@Icons.Material.Filled.Add"
+                             Href="/add-good-work">
+                        Create Good Work
+                    </MudButton>
+                </MudItem>
+            }
+        </MudGrid>
     </MudPaper>
 </MudContainer>
 
 @code {
-    MudDataGrid<GoodWorksModel> dataGrid;
-    private string globalSearchString = string.Empty;
+    private bool isAuthenticated = false;
+    private string? userId;
+    private List<GoodWorksModel>? upcomingEvents;
+    private List<GoodWorksModel>? recommendedWorks;
 
-    private async Task<GridData<GoodWorksModel>> ServerReload(GridState<GoodWorksModel> state)
+    protected override async Task OnInitializedAsync()
     {
-        var goodWorks = await _neo4jService.GetAllGoodWorksWithRelationshipsAsync();
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
 
-        // Global Search
-        if (!string.IsNullOrWhiteSpace(globalSearchString))
+        if (isAuthenticated)
         {
-            goodWorks = goodWorks.Where(g =>
-                (g.Name?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (g.Category?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (g.EffortLevel?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (g.ContactName?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (g.ContactEmail?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (g.StartTime.ToString()?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (g.EndTime.ToString()?.Contains(globalSearchString, StringComparison.OrdinalIgnoreCase) ?? false)
-            ).ToList();
-        }
-
-        // Sorting
-        if (state.SortDefinitions.Any())
-        {
-            var sortDefinition = state.SortDefinitions.First();
-            var sortField = sortDefinition.SortBy;
-            goodWorks = sortField switch
+            userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            
+            if (!string.IsNullOrEmpty(userId))
             {
-                "Name" => sortDefinition.Descending
-                    ? goodWorks.OrderByDescending(g => g.Name).ToList()
-                    : goodWorks.OrderBy(g => g.Name).ToList(),
-                "Category" => sortDefinition.Descending
-                    ? goodWorks.OrderByDescending(g => g.Category).ToList()
-                    : goodWorks.OrderBy(g => g.Category).ToList(),
-                "EffortLevel" => sortDefinition.Descending
-                    ? goodWorks.OrderByDescending(g => g.EffortLevel).ToList()
-                    : goodWorks.OrderBy(g => g.EffortLevel).ToList(),
-                "ContactName" => sortDefinition.Descending
-                    ? goodWorks.OrderByDescending(g => g.ContactName).ToList()
-                    : goodWorks.OrderBy(g => g.ContactName).ToList(),
-                "ContactEmail" => sortDefinition.Descending
-                    ? goodWorks.OrderByDescending(g => g.ContactEmail).ToList()
-                    : goodWorks.OrderBy(g => g.ContactEmail).ToList(),
-                "StartTime" => sortDefinition.Descending
-                    ? goodWorks.OrderByDescending(g => g.StartTime).ToList()
-                    : goodWorks.OrderBy(g => g.StartTime).ToList(),
-                "EndTime" => sortDefinition.Descending
-                    ? goodWorks.OrderByDescending(g => g.EndTime).ToList()
-                    : goodWorks.OrderBy(g => g.EndTime).ToList(),
-                _ => goodWorks
-            };
+                await LoadPersonalizedContent();
+            }
         }
-
-        return new GridData<GoodWorksModel>
-            {
-                TotalItems = goodWorks.Count,
-                Items = goodWorks
-            };
     }
 
-    private Task OnGlobalSearch(string text)
+    private async Task LoadPersonalizedContent()
     {
-        globalSearchString = text;
-        return dataGrid.ReloadServerData();
+        if (string.IsNullOrEmpty(userId)) return;
+
+        try
+        {
+            upcomingEvents = await _neo4jService.GetUpcomingUserEventsAsync(userId);
+            recommendedWorks = await _neo4jService.GetRecommendedGoodWorksAsync(userId, 12);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading personalized content: {ex.Message}");
+        }
     }
 }
 

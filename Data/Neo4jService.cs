@@ -582,6 +582,33 @@ public class Neo4jService : IDisposable
         await session.RunAsync(query, new { id, userId });
     }
 
+    public async Task<int> DeleteTestDataAsync(string testDataMarker)
+    {
+        var query = @"
+            MATCH (g:GoodWork)-[:TAGGED_WITH]->(t:Tag {name: $marker})
+            WITH g
+            OPTIONAL MATCH (g)-[r]-()
+            DELETE r, g
+            RETURN count(DISTINCT g) AS deletedCount";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, new { marker = testDataMarker });
+        var record = await result.SingleAsync();
+        return record["deletedCount"].As<int>();
+    }
+
+    public async Task<int> CountTestDataAsync(string testDataMarker)
+    {
+        var query = @"
+            MATCH (g:GoodWork)-[:TAGGED_WITH]->(t:Tag {name: $marker})
+            RETURN count(g) AS testDataCount";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, new { marker = testDataMarker });
+        var record = await result.SingleAsync();
+        return record["testDataCount"].As<int>();
+    }
+
     private GoodWorksModel MapRecordToGoodWork(IRecord record)
     {
         // Helper to safely get node from record
@@ -980,6 +1007,93 @@ public class Neo4jService : IDisposable
 
         using var session = _driver.AsyncSession();
         var result = await session.RunAsync(query, new { minLat, maxLat, minLng, maxLng });
+
+        var goodWorks = new List<GoodWorksModel>();
+        await result.ForEachAsync(record =>
+        {
+            goodWorks.Add(MapRecordToGoodWork(record));
+        });
+
+        return goodWorks;
+    }
+
+    public async Task<List<GoodWorksModel>> GetUpcomingUserEventsAsync(string userId)
+    {
+        var query = @"
+            MATCH (u:User {userId: $userId})-[r:SIGNED_UP_FOR|INTERESTED_IN]->(g:GoodWork)
+            WHERE g.startTime >= datetime()
+              AND g.status = 'Active'
+            OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
+            OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
+            OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)
+            WITH g, c, cat, l, type(r) AS relationshipType
+            RETURN id(g) AS Id, g, c, cat, l, 
+                   collect(DISTINCT relationshipType) AS userRelationships
+            ORDER BY g.startTime ASC
+            LIMIT 20";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, new { userId });
+
+        var goodWorks = new List<GoodWorksModel>();
+        await result.ForEachAsync(record =>
+        {
+            var goodWork = MapRecordToGoodWork(record);
+            
+            // Mark user relationships
+            if (record.ContainsKey("userRelationships"))
+            {
+                var relationships = record["userRelationships"].As<List<string>>();
+                goodWork.IsUserSignedUp = relationships.Contains("SIGNED_UP_FOR");
+                goodWork.IsUserInterested = relationships.Contains("INTERESTED_IN");
+            }
+            
+            goodWorks.Add(goodWork);
+        });
+
+        return goodWorks;
+    }
+
+    public async Task<List<GoodWorksModel>> GetRecommendedGoodWorksAsync(string userId, int limit = 10)
+    {
+        var query = @"
+            // Find user's interests
+            MATCH (u:User {userId: $userId})-[:SIGNED_UP_FOR|INTERESTED_IN]->(myWork:GoodWork)
+            OPTIONAL MATCH (myWork)-[:BELONGS_TO]->(cat:Category)
+            OPTIONAL MATCH (myWork)-[:TAGGED_WITH]->(tag:Tag)
+            
+            // Find similar good works that user hasn't interacted with
+            MATCH (recommended:GoodWork)
+            WHERE NOT (u)-[:SIGNED_UP_FOR|INTERESTED_IN]->(recommended)
+              AND recommended.startTime >= datetime()
+              AND recommended.status = 'Active'
+              AND id(recommended) <> id(myWork)
+            OPTIONAL MATCH (recommended)-[:BELONGS_TO]->(recCat:Category)
+            OPTIONAL MATCH (recommended)-[:TAGGED_WITH]->(recTag:Tag)
+            
+            // Find what friends are interested in
+            OPTIONAL MATCH (u)-[:FRIENDS_WITH]->(friend:User)-[:SIGNED_UP_FOR|INTERESTED_IN]->(recommended)
+            
+            WITH recommended, 
+                 count(DISTINCT CASE WHEN cat = recCat THEN 1 END) AS categoryMatch,
+                 count(DISTINCT CASE WHEN tag = recTag THEN 1 END) AS tagMatch,
+                 count(DISTINCT friend) AS friendInterest
+            
+            // Calculate recommendation score
+            WITH recommended,
+                 (categoryMatch * 3 + tagMatch * 2 + friendInterest * 5) AS score
+            WHERE score > 0
+            
+            OPTIONAL MATCH (recommended)-[:HAS_CONTACT]->(c:Contact)
+            OPTIONAL MATCH (recommended)-[:BELONGS_TO]->(cat:Category)
+            OPTIONAL MATCH (recommended)-[:LOCATED_IN]->(l:Location)
+            
+            RETURN id(recommended) AS Id, recommended AS g, c, cat, l, score
+            ORDER BY score DESC, recommended.startTime ASC
+            LIMIT $limit";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, new { userId, limit });
 
         var goodWorks = new List<GoodWorksModel>();
         await result.ForEachAsync(record =>
