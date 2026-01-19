@@ -6,130 +6,161 @@
 @using GoogleMapsComponents
 @using GoogleMapsComponents.Maps
 @using MudBlazor
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
 
 @inject Neo4jService _neo4jService
 @inject GooglePlacesService _googlePlacesService
 @inject GeocodingService _geoCodingServices
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@attribute [Authorize]
 
-<EditForm Model="@goodWork" OnValidSubmit="OnValidSubmit" FormName="AddGoodWorkForm">
-    <DataAnnotationsValidator />
-    <MudGrid>
-        <!-- Form Section -->
-        <MudItem xs="12" sm="5">
-            <MudCard>
-                <MudCardContent>
-                    <MudTextField Label="Name" HelperText="Enter the project name"
-                                  @bind-Value="goodWork.Name" For="@(() => goodWork.Name)" />
+<PageTitle>Add Good Work - Charity Rabbit</PageTitle>
 
-                    <MudTextField Label="Category" HelperText="Choose a category"
-                                  @bind-Value="goodWork.Category" For="@(() => goodWork.Category)" Class="mt-3" />
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+    <MudText Typo="Typo.h3" GutterBottom="true">Create New Good Work</MudText>
 
-                    <MudTextField Label="Description" HelperText="Describe the good work" Lines="3"
-                                  @bind-Value="goodWork.Description" For="@(() => goodWork.Description)" Class="mt-3" />
+    <EditForm Model="@goodWork" OnValidSubmit="OnValidSubmit" FormName="AddGoodWorkForm">
+        <DataAnnotationsValidator />
+        <MudGrid>
+            <!-- Form Section -->
+            <MudItem xs="12" sm="6">
+                <MudCard>
+                    <MudCardContent>
+                        <MudTextField Label="Name" HelperText="Enter the project name"
+                                      @bind-Value="goodWork.Name" For="@(() => goodWork.Name)" />
 
-                    <MudAutocomplete T="string"
-                                     Label="Address"
-                                     Value="@goodWork.Address"
-                                     OnInputValueChanged="OnAddressChanged"
-                                     SearchFunc="SearchAddresses"
-                                     Clearable="true"
-                                     Dense="true"
-                                     Variant="Variant.Outlined"
-                                     ValueChanged="OnAddressChanged"
-                                     Placeholder="Enter an address..." />
+                        <MudTextField Label="Category" HelperText="Choose a category"
+                                      @bind-Value="goodWork.Category" For="@(() => goodWork.Category)" Class="mt-3" />
 
-                    <!-- Date Pickers -->
-                    <MudDatePicker Label="Start Date"
-                                   Editable="true"
-                                   @bind-Date="goodWork.StartTime" />
+                        <MudTextField Label="Description" HelperText="Describe the good work" Lines="3"
+                                      @bind-Value="goodWork.Description" For="@(() => goodWork.Description)" Class="mt-3" />
 
-                    <MudTimePicker Label="Start Time" InputIcon="Icons.Material.Filled.AccessTime"
-                                   AmPm="true" @bind-Time="_startTime" />
+                        <MudTextField Label="Detailed Description" HelperText="Provide more details" Lines="5"
+                                      @bind-Value="goodWork.DetailedDescription" Class="mt-3" />
 
+                        <MudAutocomplete T="string"
+                                         Label="Address"
+                                         Value="@goodWork.Address"
+                                         SearchFunc="SearchAddresses"
+                                         Clearable="true"
+                                         Dense="true"
+                                         Variant="Variant.Outlined"
+                                         ValueChanged="OnAddressChanged"
+                                         Placeholder="Enter an address..."
+                                         Class="mt-3" />
 
-                    <MudDatePicker Label="End Date"
-                                   Editable="true"
-                                   @bind-Date="goodWork.EndTime" />
+                        <MudDatePicker Label="Start Date"
+                                       Editable="true"
+                                       @bind-Date="goodWork.StartTime"
+                                       Class="mt-3" />
 
-                    <MudTimePicker Label="End Time"
-                                   InputIcon="Icons.Material.Filled.AccessTime"
-                                   AmPm="true" @bind-Time="_endTime" />
+                        <MudTimePicker Label="Start Time" InputIcon="Icons.Material.Filled.AccessTime"
+                                       AmPm="true" @bind-Time="_startTime" Class="mt-3" />
 
-                    <MudTextField Label="Contact Name" @bind-Value="goodWork.ContactName"
-                                  For="@(() => goodWork.ContactName)" Class="mt-3" />
-                    <MudTextField Label="Contact Email" @bind-Value="goodWork.ContactEmail"
-                                  For="@(() => goodWork.ContactEmail)" Class="mt-3" />
-                    <MudTextField Label="Contact Phone" @bind-Value="goodWork.ContactPhone"
-                                  For="@(() => goodWork.ContactPhone)" Class="mt-3" />
+                        <MudDatePicker Label="End Date"
+                                       Editable="true"
+                                       @bind-Date="goodWork.EndTime"
+                                       Class="mt-3" />
 
-                    <MudSelect Label="Effort Level" @bind-Value="goodWork.EffortLevel" Class="mt-3">
-                        <MudSelectItem Value=@("Light") >Light</MudSelectItem>
-                        <MudSelectItem Value=@("Moderate")>Moderate</MudSelectItem>
-                        <MudSelectItem Value=@("Heavy")>Heavy</MudSelectItem>
-                    </MudSelect>
+                        <MudTimePicker Label="End Time"
+                                       InputIcon="Icons.Material.Filled.AccessTime"
+                                       AmPm="true" @bind-Time="_endTime" Class="mt-3" />
 
-                    @if (success)
-                    {
-                        <MudText Color="Color.Success">Good work successfully added!</MudText>
-                    }
-                    else
-                    {
-                        <MudText Color="@Color.Error">
-                            <ValidationSummary />
-                        </MudText>
-                    }
-                </MudCardContent>
+                        <MudTextField Label="Contact Name" @bind-Value="goodWork.ContactName"
+                                      For="@(() => goodWork.ContactName)" Class="mt-3" />
+                        <MudTextField Label="Contact Email" @bind-Value="goodWork.ContactEmail"
+                                      For="@(() => goodWork.ContactEmail)" Class="mt-3" />
+                        <MudTextField Label="Contact Phone" @bind-Value="goodWork.ContactPhone"
+                                      For="@(() => goodWork.ContactPhone)" Class="mt-3" />
 
-                <MudCardActions>
-                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">
-                        Create Good Work
-                    </MudButton>
-                </MudCardActions>
-            </MudCard>
-        </MudItem>
+                        <MudSelect Label="Effort Level" @bind-Value="goodWork.EffortLevel" Class="mt-3">
+                            <MudSelectItem Value=@("Light")>Light</MudSelectItem>
+                            <MudSelectItem Value=@("Moderate")>Moderate</MudSelectItem>
+                            <MudSelectItem Value=@("Heavy")>Heavy</MudSelectItem>
+                        </MudSelect>
 
-        <!-- Map Section -->
-        <MudItem xs="12" sm="7">
-            <MudPaper Elevation="4" Class="pa-4">
-                <MudText Typo="Typo.h5" Class="mb-2">Location Map</MudText>
-                <GoogleMap @ref="_map" Options="@_mapOptions" Height="600px" OnAfterInit="InitializeMap">
-                </GoogleMap>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-</EditForm>
+                        <MudNumericField Label="Max Participants" @bind-Value="goodWork.MaxParticipants" 
+                                       Class="mt-3" Min="0" HideSpinButtons="true" />
 
-<style>
-    .fab-refresh {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 1000;
-    }
-</style>
+                        <MudNumericField Label="Minimum Age" @bind-Value="goodWork.MinimumAge" 
+                                       Class="mt-3" Min="0" HideSpinButtons="true" />
+
+                        <MudSwitch @bind-Value="goodWork.IsVirtual" Label="Virtual Event" Color="Color.Primary" Class="mt-3" />
+                        <MudSwitch @bind-Value="goodWork.FamilyFriendly" Label="Family Friendly" Color="Color.Primary" />
+                        <MudSwitch @bind-Value="goodWork.IsAccessible" Label="Wheelchair Accessible" Color="Color.Primary" />
+
+                        @if (success)
+                        {
+                            <MudText Color="Color.Success" Class="mt-3">Good work successfully added!</MudText>
+                        }
+                        else if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <MudAlert Severity="Severity.Error" Class="mt-3">@errorMessage</MudAlert>
+                        }
+                        else
+                        {
+                            <MudText Color="@Color.Error">
+                                <ValidationSummary />
+                            </MudText>
+                        }
+                    </MudCardContent>
+
+                    <MudCardActions>
+                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">
+                            Create Good Work
+                        </MudButton>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+
+            <!-- Map Section -->
+            <MudItem xs="12" sm="6">
+                <MudPaper Elevation="4" Class="pa-4">
+                    <MudText Typo="Typo.h5" Class="mb-2">Location Map</MudText>
+                    <GoogleMap @ref="_map" Options="@_mapOptions" Height="600px" OnAfterInit="InitializeMap">
+                    </GoogleMap>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </EditForm>
+</MudContainer>
 
 @code {
     private GoodWorksModel goodWork = new GoodWorksModel();
     private bool success;
-    private GoogleMap _map;
-    private MapOptions _mapOptions;
-    private Marker _marker;
+    private string? errorMessage;
+    private string? userId;
+    private GoogleMap? _map;
+    private MapOptions _mapOptions = new();
+    private Marker? _marker;
 
-    private TimeSpan? _startTime = new TimeSpan(1, 0, 0);
-    private TimeSpan? _endTime = new TimeSpan(1, 0, 0);
+    private TimeSpan? _startTime = new TimeSpan(9, 0, 0);
+    private TimeSpan? _endTime = new TimeSpan(17, 0, 0);
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+
         _mapOptions = new MapOptions
-            {
-                Zoom = 10,
-                Center = new LatLngLiteral(34.7304, -86.5861), // Default location
-                MapTypeId = MapTypeId.Roadmap
-            };
+        {
+            Zoom = 12,
+            Center = new LatLngLiteral(34.7304, -86.5861),
+            MapTypeId = MapTypeId.Roadmap
+        };
+
+        goodWork.CreatedDate = DateTime.UtcNow;
     }
 
     private async Task<IEnumerable<string>> SearchAddresses(string value, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrEmpty(value)) return Array.Empty<string>();
         return await _googlePlacesService.GetAddressSuggestionsAsync(value);
     }
 
@@ -143,7 +174,6 @@
         goodWork.Latitude = latitude;
         goodWork.Longitude = longitude;
 
-        // Drop a pin on the map at the selected location
         await UpdateMapLocation(latitude, longitude);
     }
 
@@ -157,56 +187,67 @@
 
     private async Task UpdateMapLocation(double latitude, double longitude)
     {
+        if (_map == null) return;
+
         var position = new LatLngLiteral(latitude, longitude);
 
-        // Center the map on the new location
         await _map.InteropObject.SetCenter(position);
 
-        // Remove the previous marker if it exists
         if (_marker != null)
         {
             await _marker.SetMap(null);
         }
 
-        // Add new marker at the selected location
         _marker = await Marker.CreateAsync(_map.JsRuntime, new MarkerOptions
-            {
-                Position = position,
-                Map = _map.InteropObject,
-                Title = "Selected Location"
-            });
+        {
+            Position = position,
+            Map = _map.InteropObject,
+            Title = "Selected Location"
+        });
     }
-
-
 
     private async Task OnValidSubmit()
     {
+        try
+        {
+            if (goodWork.StartTime.HasValue && _startTime.HasValue)
+            {
+                goodWork.StartTime = goodWork.StartTime.Value.Date.Add(_startTime.Value);
+            }
+            else if (_startTime.HasValue)
+            {
+                goodWork.StartTime = DateTime.Today.Add(_startTime.Value);
+            }
 
-        if (goodWork.StartTime.HasValue)
-        {
-            goodWork.StartTime = goodWork.StartTime.Value.Date.Add(_startTime.Value);
-        }
-        else
-        {
-            goodWork.StartTime = DateTime.Today.Add(_startTime.Value); // Default to today if not set
-        }
+            if (goodWork.EndTime.HasValue && _endTime.HasValue)
+            {
+                goodWork.EndTime = goodWork.EndTime.Value.Date.Add(_endTime.Value);
+            }
+            else if (_endTime.HasValue)
+            {
+                goodWork.EndTime = DateTime.Today.Add(_endTime.Value);
+            }
 
-        if (goodWork.EndTime.HasValue)
-        {
-            goodWork.EndTime = goodWork.EndTime.Value.Date.Add(_endTime.Value);
-        }
-        else
-        {
-            goodWork.EndTime = DateTime.Today.Add(_endTime.Value); // Default to today if not set
-        }
+            await _neo4jService.CreateGoodWorkAsync(goodWork, userId);
+            success = true;
+            errorMessage = null;
 
-        await _neo4jService.CreateGoodWorkAsync(goodWork);
-        success = true;
-        goodWork = new GoodWorksModel(); // Reset form
+            // Reset form after a short delay
+            await Task.Delay(1500);
+            goodWork = new GoodWorksModel { CreatedDate = DateTime.UtcNow };
+            success = false;
 
-        if (_marker != null)
+            if (_marker != null)
+            {
+                await _marker.SetMap(null);
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
         {
-            await _marker.SetMap(null); // Remove pin after successful submission
+            errorMessage = $"Error creating good work: {ex.Message}";
+            success = false;
         }
     }
 }

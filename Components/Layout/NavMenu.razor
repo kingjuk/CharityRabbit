@@ -7,14 +7,13 @@
     <MudNavLink Href="search" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Search">Search</MudNavLink>
     <MudNavLink Href="map" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Map">Map</MudNavLink>
     
-    <MudNavLink Href="add-good-work" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Add Good Works</MudNavLink>
-
     <AuthorizeView>
         <Authorized>
-            <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">@context.User.Identity?.Name</MudNavLink>
+            <MudNavLink Href="profile" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">My Profile</MudNavLink>
+            <MudNavLink Href="add-good-work" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Add Good Works</MudNavLink>
+            <MudNavLink Href="auth" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.AccountCircle">@context.User.Identity?.Name</MudNavLink>
             <form action="authentication/logout" method="post">
-@*                 <AntiforgeryToken />
- *@                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
                 <button type="submit" class="mud-nav-link mud-ripple">
                     <MudIcon Icon="@Icons.Material.Filled.Logout" Color="Color.Info" Class="mr-3"></MudIcon> Logout
                 </button>

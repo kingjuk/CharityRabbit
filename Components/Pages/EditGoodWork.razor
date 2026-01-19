@@ -1,0 +1,290 @@
+@page "/edit-good-work/{id:long}"
+@using System.ComponentModel.DataAnnotations
+@using CharityRabbit.Data
+@using CharityRabbit.Models
+@using MLS.Api.Services
+@using GoogleMapsComponents
+@using GoogleMapsComponents.Maps
+@using MudBlazor
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+
+@inject Neo4jService _neo4jService
+@inject GooglePlacesService _googlePlacesService
+@inject GeocodingService _geoCodingServices
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@attribute [Authorize]
+
+<PageTitle>Edit Good Work - Charity Rabbit</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+    @if (goodWork == null)
+    {
+        <MudProgressCircular Indeterminate="true" />
+        <MudText>Loading...</MudText>
+    }
+    else if (!isAuthorized)
+    {
+        <MudAlert Severity="Severity.Error">You are not authorized to edit this good work.</MudAlert>
+        <MudButton Href="/profile" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3">
+            Back to Profile
+        </MudButton>
+    }
+    else
+    {
+        <MudText Typo="Typo.h3" GutterBottom="true">Edit Good Work</MudText>
+
+        <EditForm Model="@goodWork" OnValidSubmit="OnValidSubmit">
+            <DataAnnotationsValidator />
+            <MudGrid>
+                <!-- Form Section -->
+                <MudItem xs="12" sm="6">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudTextField Label="Name" HelperText="Enter the project name"
+                                          @bind-Value="goodWork.Name" For="@(() => goodWork.Name)" />
+
+                            <MudTextField Label="Category" HelperText="Choose a category"
+                                          @bind-Value="goodWork.Category" For="@(() => goodWork.Category)" Class="mt-3" />
+
+                            <MudTextField Label="Description" HelperText="Describe the good work" Lines="3"
+                                          @bind-Value="goodWork.Description" For="@(() => goodWork.Description)" Class="mt-3" />
+
+                            <MudTextField Label="Detailed Description" HelperText="Provide more details" Lines="5"
+                                          @bind-Value="goodWork.DetailedDescription" Class="mt-3" />
+
+                            <MudAutocomplete T="string"
+                                             Label="Address"
+                                             Value="@goodWork.Address"
+                                             SearchFunc="SearchAddresses"
+                                             Clearable="true"
+                                             Dense="true"
+                                             Variant="Variant.Outlined"
+                                             ValueChanged="OnAddressChanged"
+                                             Placeholder="Enter an address..."
+                                             Class="mt-3" />
+
+                            <MudDatePicker Label="Start Date" Editable="true"
+                                           @bind-Date="startDate" Class="mt-3" />
+
+                            <MudTimePicker Label="Start Time" InputIcon="Icons.Material.Filled.AccessTime"
+                                           AmPm="true" @bind-Time="_startTime" Class="mt-3" />
+
+                            <MudDatePicker Label="End Date" Editable="true"
+                                           @bind-Date="endDate" Class="mt-3" />
+
+                            <MudTimePicker Label="End Time" InputIcon="Icons.Material.Filled.AccessTime"
+                                           AmPm="true" @bind-Time="_endTime" Class="mt-3" />
+
+                            <MudTextField Label="Contact Name" @bind-Value="goodWork.ContactName"
+                                          For="@(() => goodWork.ContactName)" Class="mt-3" />
+
+                            <MudTextField Label="Contact Email" @bind-Value="goodWork.ContactEmail"
+                                          For="@(() => goodWork.ContactEmail)" Class="mt-3" />
+
+                            <MudTextField Label="Contact Phone" @bind-Value="goodWork.ContactPhone"
+                                          For="@(() => goodWork.ContactPhone)" Class="mt-3" />
+
+                            <MudSelect Label="Effort Level" @bind-Value="goodWork.EffortLevel" Class="mt-3">
+                                <MudSelectItem Value=@("Light")>Light</MudSelectItem>
+                                <MudSelectItem Value=@("Moderate")>Moderate</MudSelectItem>
+                                <MudSelectItem Value=@("Heavy")>Heavy</MudSelectItem>
+                            </MudSelect>
+
+                            <MudNumericField Label="Max Participants" @bind-Value="goodWork.MaxParticipants" 
+                                           Class="mt-3" Min="0" />
+
+                            <MudNumericField Label="Minimum Age" @bind-Value="goodWork.MinimumAge" 
+                                           Class="mt-3" Min="0" />
+
+                            <MudSwitch @bind-Value="goodWork.IsVirtual" Label="Virtual Event" Color="Color.Primary" Class="mt-3" />
+                            <MudSwitch @bind-Value="goodWork.FamilyFriendly" Label="Family Friendly" Color="Color.Primary" />
+                            <MudSwitch @bind-Value="goodWork.IsAccessible" Label="Wheelchair Accessible" Color="Color.Primary" />
+
+                            @if (success)
+                            {
+                                <MudText Color="Color.Success" Class="mt-3">Good work successfully updated!</MudText>
+                            }
+                            @if (!string.IsNullOrEmpty(errorMessage))
+                            {
+                                <MudAlert Severity="Severity.Error" Class="mt-3">@errorMessage</MudAlert>
+                            }
+                        </MudCardContent>
+
+                        <MudCardActions>
+                            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" 
+                                     Color="Color.Primary" Class="ml-auto">
+                                Update Good Work
+                            </MudButton>
+                            <MudButton Variant="Variant.Filled" Color="Color.Default" 
+                                     Href="/profile">
+                                Cancel
+                            </MudButton>
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+
+                <!-- Map Section -->
+                <MudItem xs="12" sm="6">
+                    <MudPaper Elevation="4" Class="pa-4">
+                        <MudText Typo="Typo.h5" Class="mb-2">Location Map</MudText>
+                        <GoogleMap @ref="_map" Options="@_mapOptions" Height="600px" OnAfterInit="InitializeMap">
+                        </GoogleMap>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </EditForm>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private GoodWorksModel? goodWork;
+    private bool success;
+    private bool isAuthorized;
+    private string? errorMessage;
+    private string? userId;
+    private GoogleMap _map;
+    private MapOptions _mapOptions;
+    private Marker? _marker;
+
+    private DateTime? startDate;
+    private DateTime? endDate;
+    private TimeSpan? _startTime;
+    private TimeSpan? _endTime;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+
+        _mapOptions = new MapOptions
+        {
+            Zoom = 12,
+            Center = new LatLngLiteral(34.7304, -86.5861),
+            MapTypeId = MapTypeId.Roadmap
+        };
+
+        await LoadGoodWork();
+    }
+
+    private async Task LoadGoodWork()
+    {
+        goodWork = await _neo4jService.GetGoodWorkByIdAsync(Id, userId);
+
+        if (goodWork != null)
+        {
+            // Check authorization - only creator can edit
+            var createdGoodWorks = await _neo4jService.GetUserCreatedGoodWorksAsync(userId ?? string.Empty);
+            isAuthorized = createdGoodWorks.Any(gw => gw.Id == Id);
+
+            if (isAuthorized)
+            {
+                // Set date and time from goodWork
+                if (goodWork.StartTime.HasValue)
+                {
+                    startDate = goodWork.StartTime.Value.Date;
+                    _startTime = goodWork.StartTime.Value.TimeOfDay;
+                }
+
+                if (goodWork.EndTime.HasValue)
+                {
+                    endDate = goodWork.EndTime.Value.Date;
+                    _endTime = goodWork.EndTime.Value.TimeOfDay;
+                }
+            }
+        }
+        else
+        {
+            isAuthorized = false;
+        }
+    }
+
+    private async Task<IEnumerable<string>> SearchAddresses(string value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(value)) return Array.Empty<string>();
+        return await _googlePlacesService.GetAddressSuggestionsAsync(value);
+    }
+
+    private async Task OnAddressChanged(string address)
+    {
+        if (string.IsNullOrEmpty(address) || goodWork == null) return;
+
+        var (latitude, longitude) = await _geoCodingServices.GetCoordinatesAsync(address);
+
+        goodWork.Address = address;
+        goodWork.Latitude = latitude;
+        goodWork.Longitude = longitude;
+
+        await UpdateMapLocation(latitude, longitude);
+    }
+
+    private async Task InitializeMap()
+    {
+        if (goodWork != null && goodWork.Latitude != 0 && goodWork.Longitude != 0)
+        {
+            await UpdateMapLocation(goodWork.Latitude, goodWork.Longitude);
+        }
+    }
+
+    private async Task UpdateMapLocation(double latitude, double longitude)
+    {
+        if (_map == null) return;
+
+        var position = new LatLngLiteral(latitude, longitude);
+
+        await _map.InteropObject.SetCenter(position);
+
+        if (_marker != null)
+        {
+            await _marker.SetMap(null);
+        }
+
+        _marker = await Marker.CreateAsync(_map.JsRuntime, new MarkerOptions
+        {
+            Position = position,
+            Map = _map.InteropObject,
+            Title = "Selected Location"
+        });
+    }
+
+    private async Task OnValidSubmit()
+    {
+        if (goodWork == null || string.IsNullOrEmpty(userId)) return;
+
+        try
+        {
+            // Combine date and time
+            if (startDate.HasValue && _startTime.HasValue)
+            {
+                goodWork.StartTime = startDate.Value.Date.Add(_startTime.Value);
+            }
+
+            if (endDate.HasValue && _endTime.HasValue)
+            {
+                goodWork.EndTime = endDate.Value.Date.Add(_endTime.Value);
+            }
+
+            await _neo4jService.UpdateGoodWorkAsync(Id, goodWork, userId);
+            success = true;
+            errorMessage = null;
+
+            // Redirect to profile after a short delay
+            await Task.Delay(1500);
+            Navigation.NavigateTo("/profile");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error updating good work: {ex.Message}";
+            success = false;
+        }
+    }
+}

@@ -19,7 +19,7 @@ public class Neo4jService : IDisposable
         _locationServices = locationServices;
     }
 
-    public async Task CreateGoodWorkAsync(GoodWorksModel goodWork)
+    public async Task CreateGoodWorkAsync(GoodWorksModel goodWork, string? userId = null)
     {
         var (city, state, country, zip) = await _locationServices.GetLocationDetailsAsync(goodWork.Latitude, goodWork.Longitude);
 
@@ -52,7 +52,8 @@ public class Neo4jService : IDisposable
                 status: $status,
                 outdoorActivity: $outdoorActivity,
                 weatherDependent: $weatherDependent,
-                createdDate: datetime($createdDate)
+                createdDate: datetime($createdDate),
+                createdBy: $createdBy
             })
             WITH g
             MERGE (c:Contact { email: $contactEmail })
@@ -117,6 +118,7 @@ public class Neo4jService : IDisposable
             outdoorActivity = goodWork.OutdoorActivity,
             weatherDependent = goodWork.WeatherDependent,
             createdDate = goodWork.CreatedDate.ToString("o"),
+            createdBy = userId ?? string.Empty,
             contactName = goodWork.ContactName ?? string.Empty,
             contactEmail = goodWork.ContactEmail ?? string.Empty,
             contactPhone = goodWork.ContactPhone ?? string.Empty,
@@ -447,6 +449,137 @@ public class Neo4jService : IDisposable
         });
 
         return goodWorks;
+    }
+
+    public async Task<List<GoodWorksModel>> GetUserCreatedGoodWorksAsync(string userId)
+    {
+        var query = @"
+            MATCH (g:GoodWork)
+            WHERE g.createdBy = $userId
+            OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
+            OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
+            OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)
+            RETURN id(g) AS Id, g, c, cat, l
+            ORDER BY g.createdDate DESC";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, new { userId });
+
+        var goodWorks = new List<GoodWorksModel>();
+        await result.ForEachAsync(record =>
+        {
+            goodWorks.Add(MapRecordToGoodWork(record));
+        });
+
+        return goodWorks;
+    }
+
+    public async Task UpdateGoodWorkAsync(long id, GoodWorksModel goodWork, string userId)
+    {
+        var (city, state, country, zip) = await _locationServices.GetLocationDetailsAsync(goodWork.Latitude, goodWork.Longitude);
+
+        var query = @"
+            MATCH (g:GoodWork)
+            WHERE id(g) = $id AND g.createdBy = $userId
+            SET g.name = $name,
+                g.description = $description,
+                g.detailedDescription = $detailedDescription,
+                g.latitude = $latitude,
+                g.longitude = $longitude,
+                g.startTime = datetime($startTime),
+                g.endTime = datetime($endTime),
+                g.effortLevel = $effortLevel,
+                g.isAccessible = $isAccessible,
+                g.estimatedDuration = $estimatedDuration,
+                g.isVirtual = $isVirtual,
+                g.maxParticipants = $maxParticipants,
+                g.minimumAge = $minimumAge,
+                g.familyFriendly = $familyFriendly,
+                g.isRecurring = $isRecurring,
+                g.recurrencePattern = $recurrencePattern,
+                g.organizationName = $organizationName,
+                g.organizationWebsite = $organizationWebsite,
+                g.parkingAvailable = $parkingAvailable,
+                g.publicTransitAccessible = $publicTransitAccessible,
+                g.specialInstructions = $specialInstructions,
+                g.impactDescription = $impactDescription,
+                g.estimatedPeopleHelped = $estimatedPeopleHelped,
+                g.status = $status,
+                g.outdoorActivity = $outdoorActivity,
+                g.weatherDependent = $weatherDependent
+            
+            WITH g
+            MERGE (c:Contact { email: $contactEmail })
+            ON CREATE SET c.name = $contactName, c.phone = $contactPhone
+            ON MATCH SET c.name = $contactName, c.phone = $contactPhone
+            MERGE (g)-[:HAS_CONTACT]->(c)
+            
+            WITH g
+            OPTIONAL MATCH (g)-[:BELONGS_TO]->(oldCat:Category)
+            DELETE oldCat
+            MERGE (cat:Category { name: $category })
+            MERGE (g)-[:BELONGS_TO]->(cat)
+            
+            WITH g
+            OPTIONAL MATCH (g)-[:LOCATED_IN]->(oldLoc:Location)
+            DELETE oldLoc
+            MERGE (l:Location { city: $city, state: $state, country: $country, zip: $zip })
+            MERGE (g)-[:LOCATED_IN]->(l)
+            
+            RETURN id(g) AS id";
+
+        using var session = _driver.AsyncSession();
+        await session.RunAsync(query, new
+        {
+            id,
+            userId,
+            name = goodWork.Name,
+            description = goodWork.Description ?? string.Empty,
+            detailedDescription = goodWork.DetailedDescription ?? string.Empty,
+            latitude = goodWork.Latitude,
+            longitude = goodWork.Longitude,
+            startTime = goodWork.StartTime?.ToString("o"),
+            endTime = goodWork.EndTime?.ToString("o"),
+            effortLevel = goodWork.EffortLevel ?? "Moderate",
+            isAccessible = goodWork.IsAccessible,
+            estimatedDuration = goodWork.EstimatedDuration?.TotalMinutes ?? 0,
+            isVirtual = goodWork.IsVirtual,
+            maxParticipants = goodWork.MaxParticipants,
+            minimumAge = goodWork.MinimumAge,
+            familyFriendly = goodWork.FamilyFriendly,
+            isRecurring = goodWork.IsRecurring,
+            recurrencePattern = goodWork.RecurrencePattern ?? string.Empty,
+            organizationName = goodWork.OrganizationName ?? string.Empty,
+            organizationWebsite = goodWork.OrganizationWebsite ?? string.Empty,
+            parkingAvailable = goodWork.ParkingAvailable,
+            publicTransitAccessible = goodWork.PublicTransitAccessible,
+            specialInstructions = goodWork.SpecialInstructions ?? string.Empty,
+            impactDescription = goodWork.ImpactDescription ?? string.Empty,
+            estimatedPeopleHelped = goodWork.EstimatedPeopleHelped,
+            status = goodWork.Status ?? "Active",
+            outdoorActivity = goodWork.OutdoorActivity,
+            weatherDependent = goodWork.WeatherDependent,
+            contactName = goodWork.ContactName ?? string.Empty,
+            contactEmail = goodWork.ContactEmail ?? string.Empty,
+            contactPhone = goodWork.ContactPhone ?? string.Empty,
+            category = goodWork.Category ?? string.Empty,
+            city = city ?? string.Empty,
+            state = state ?? string.Empty,
+            country = country ?? string.Empty,
+            zip = zip ?? string.Empty
+        });
+    }
+
+    public async Task DeleteGoodWorkAsync(long id, string userId)
+    {
+        var query = @"
+            MATCH (g:GoodWork)
+            WHERE id(g) = $id AND g.createdBy = $userId
+            OPTIONAL MATCH (g)-[r]-()
+            DELETE r, g";
+
+        using var session = _driver.AsyncSession();
+        await session.RunAsync(query, new { id, userId });
     }
 
     private GoodWorksModel MapRecordToGoodWork(IRecord record)
