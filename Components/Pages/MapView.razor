@@ -4,8 +4,10 @@
 @using GoogleMapsComponents
 @using GoogleMapsComponents.Maps
 @using MudBlazor
+@using MouseEvent = GoogleMapsComponents.Maps.MouseEvent
 
 @inject Neo4jService Neo4jService
+@inject NavigationManager NavigationManager
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
     <MudPaper Elevation="4" Class="pa-4">
@@ -15,31 +17,6 @@
     </MudPaper>
 
     <MudFab Icon="@Icons.Material.Filled.Refresh" Class="fab-refresh" OnClick="ReloadData" Color="Color.Secondary" />
-
-    <MudDrawer Anchor="Anchor.End" Open="@isDrawerOpen" Class="pa-4" Width="400px" Variant="DrawerVariant.Temporary">
-        <MudToolbar>
-            <MudText Typo="Typo.h6" Class="ml-2">Good Works Details</MudText>
-            <MudSpacer />
-            <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="() => isDrawerOpen = false" />
-        </MudToolbar>
-        <MudDivider />
-        @if (selectedWork != null)
-        {
-            <MudCard Class="ma-2 pa-4">
-                <MudCardContent>
-                    <MudText Typo="Typo.h5" Class="mb-2">@selectedWork.Name</MudText>
-                    <MudText Class="mb-2">@selectedWork.Description</MudText>
-                    <MudText><strong>Category:</strong> @selectedWork.Category</MudText>
-                    <MudText><strong>Effort Level:</strong> @selectedWork.EffortLevel</MudText>
-                    <MudText><strong>Contact:</strong> @selectedWork.ContactName (@selectedWork.ContactEmail)</MudText>
-                </MudCardContent>
-            </MudCard>
-        }
-        else
-        {
-            <MudText>No Good Work Selected</MudText>
-        }
-    </MudDrawer>
 </MudContainer>
 
 <style>
@@ -55,15 +32,15 @@
     private GoogleMap _map;
     private MapOptions _mapOptions;
     private List<GoodWorksModel>? GoodWorks;
-    private bool isDrawerOpen = false;
-    private GoodWorksModel? selectedWork;
+    private InfoWindow? _currentInfoWindow;
+    private List<Marker> _markers = new();
 
     protected override async Task OnInitializedAsync()
     {
         _mapOptions = new MapOptions
         {
             Zoom = 12,
-            Center = new LatLngLiteral { Lat = 34.7304, Lng = -86.5861 },
+            Center = new LatLngLiteral(34.7304, -86.5861),
             MapTypeId = MapTypeId.Roadmap,
             MapId = "1c544c4b742178bf"
         };
@@ -73,60 +50,155 @@
 
     private async Task AfterMapRender()
     {
-        var southWest = new LatLngLiteral { Lat = -90, Lng = -180 };
-        var northEast = new LatLngLiteral { Lat = 90, Lng = 180 };
-
-        GoodWorks = await Neo4jService.GetGoodWorksInBoundsAsync(
-            southWest.Lat,
-            northEast.Lat,
-            southWest.Lng,
-            northEast.Lng
-        );
-
-        if (GoodWorks == null) return;
-
-        foreach (var work in GoodWorks)
+        try
         {
-            var advMarker = await AdvancedMarkerElement.CreateAsync(
-                _map.JsRuntime,
-                new AdvancedMarkerElementOptions
+            var southWest = new LatLngLiteral(-90, -180);
+            var northEast = new LatLngLiteral(90, 180);
+
+            GoodWorks = await Neo4jService.GetGoodWorksInBoundsAsync(
+                southWest.Lat,
+                northEast.Lat,
+                southWest.Lng,
+                northEast.Lng
+            );
+
+            if (GoodWorks == null || !GoodWorks.Any())
+            {
+                Console.WriteLine("No good works found");
+                return;
+            }
+
+            Console.WriteLine($"Loaded {GoodWorks.Count} good works");
+
+            foreach (var work in GoodWorks)
+            {
+                var marker = await Marker.CreateAsync(_map.JsRuntime, new MarkerOptions
                 {
-                    Position = new LatLngLiteral { Lat = work.Latitude, Lng = work.Longitude },
-                    Content = GenerateInnerContent(work),
+                    Position = new LatLngLiteral(work.Latitude, work.Longitude),
+                    Map = _map.InteropObject,
                     Title = work.Name,
-                    Map = _map.InteropObject
+                    Clickable = true
                 });
 
-            await advMarker.AddListener("click", () => OnMarkerClick(work));
+                await marker.AddListener<MouseEvent>("click", async (e) => await OnMarkerClick(work, marker));
+                _markers.Add(marker);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading good works: {ex.Message}");
         }
     }
 
-    private string GenerateInnerContent(GoodWorksModel work)
+    private async Task OnMarkerClick(GoodWorksModel work, Marker marker)
     {
+        // Close previous info window if open
+        if (_currentInfoWindow != null)
+        {
+            await _currentInfoWindow.Close();
+        }
+
+        var content = GenerateInfoWindowContent(work);
+
+        _currentInfoWindow = await InfoWindow.CreateAsync(_map.JsRuntime, new InfoWindowOptions
+        {
+            Content = content,
+            Position = new LatLngLiteral(work.Latitude, work.Longitude)
+        });
+
+        await _currentInfoWindow.Open(_map.InteropObject, marker);
+        StateHasChanged();
+    }
+
+    private string GenerateInfoWindowContent(GoodWorksModel work)
+    {
+        var startTime = work.StartTime?.ToString("MMM dd, yyyy h:mm tt") ?? "Not specified";
+        var endTime = work.EndTime?.ToString("MMM dd, yyyy h:mm tt") ?? "Not specified";
+        var address = !string.IsNullOrEmpty(work.Address) ? work.Address : "Address not provided";
+        var detailedDesc = !string.IsNullOrEmpty(work.DetailedDescription) ? work.DetailedDescription : work.Description;
+        var contact = !string.IsNullOrEmpty(work.ContactPhone) ? $"📞 {work.ContactPhone}<br/>" : "";
+
         return $@"
-        <div style='text-align: center; width: 200px;'>
-            <div style='margin-bottom: 8px;'>
-                <i class='mud-icon mud-icon-size-xxl mud-icon-color-primary'>location_on</i>
+        <div style='max-width: 350px; padding: 12px; font-family: Roboto, Arial, sans-serif;'>
+            <h3 style='margin: 0 0 8px 0; color: #1976D2; font-size: 18px; font-weight: 500;'>{work.Name}</h3>
+            
+            <div style='margin-bottom: 12px;'>
+                <span style='background: #E3F2FD; color: #1976D2; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;'>
+                    {work.Category}
+                </span>
+                <span style='background: #FFF3E0; color: #F57C00; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;'>
+                    {work.EffortLevel}
+                </span>
             </div>
-            <h4 class='mud-typography mud-typography-h6' style='color: #1976D2;'>{work.Name}</h4>
-            <p class='mud-typography mud-typography-body2' style='color: #757575;'>{work.Category}</p>
-            <button class='mud-button mud-button-contained mud-button-primary'>
-                <span class='mud-button-label'>View Details</span>
-            </button>
+
+            <p style='margin: 8px 0; color: #424242; font-size: 14px; line-height: 1.5;'>{detailedDesc}</p>
+            
+            <div style='margin: 12px 0; padding: 8px; background: #F5F5F5; border-radius: 4px;'>
+                <div style='margin-bottom: 4px; font-size: 13px; color: #616161;'>
+                    <strong>📅 Start:</strong> {startTime}
+                </div>
+                <div style='margin-bottom: 4px; font-size: 13px; color: #616161;'>
+                    <strong>🏁 End:</strong> {endTime}
+                </div>
+                <div style='font-size: 13px; color: #616161;'>
+                    <strong>📍 Location:</strong> {address}
+                </div>
+            </div>
+
+            <div style='margin: 12px 0; padding: 8px; background: #E8F5E9; border-radius: 4px;'>
+                <div style='font-size: 13px; color: #2E7D32; margin-bottom: 4px;'>
+                    <strong>Contact:</strong> {work.ContactName}
+                </div>
+                <div style='font-size: 13px; color: #2E7D32;'>
+                    📧 {work.ContactEmail}<br/>
+                    {contact}
+                </div>
+            </div>
+
+            {(work.MaxParticipants.HasValue ? $@"
+            <div style='margin: 8px 0; font-size: 13px; color: #616161;'>
+                <strong>👥 Participants:</strong> {work.CurrentParticipants} / {work.MaxParticipants.Value}
+            </div>" : "")}
+
+            {(work.IsAccessible ? "<div style='margin: 4px 0; font-size: 12px; color: #4CAF50;'>♿ Wheelchair Accessible</div>" : "")}
+            {(work.IsVirtual ? "<div style='margin: 4px 0; font-size: 12px; color: #2196F3;'>💻 Virtual Event</div>" : "")}
+            {(work.FamilyFriendly ? "<div style='margin: 4px 0; font-size: 12px; color: #9C27B0;'>👨‍👩‍👧‍👦 Family Friendly</div>" : "")}
+
+            <div style='margin-top: 12px; text-align: center;'>
+                <a href='/goodwork/{work.Id}' 
+                   style='display: inline-block; background: #1976D2; color: white; padding: 8px 16px; 
+                          border-radius: 4px; text-decoration: none; font-weight: 500; font-size: 14px;'>
+                    View Full Details
+                </a>
+            </div>
         </div>";
     }
 
-    private void OnMarkerClick(GoodWorksModel work)
+    private async Task ReloadData()
     {
-        selectedWork = work;
-        isDrawerOpen = true;
-        StateHasChanged();
-    }
+        try
+        {
+            // Close info window
+            if (_currentInfoWindow != null)
+            {
+                await _currentInfoWindow.Close();
+                _currentInfoWindow = null;
+            }
 
-    private void ReloadData()
-    {
-        isDrawerOpen = false;
-        selectedWork = null;
-        StateHasChanged();
+            // Clear existing markers
+            foreach (var marker in _markers)
+            {
+                await marker.SetMap(null);
+            }
+            _markers.Clear();
+
+            // Reload data
+            await AfterMapRender();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error reloading data: {ex.Message}");
+        }
     }
 }

@@ -1,0 +1,216 @@
+@page "/search"
+@using CharityRabbit.Models
+@inject Neo4jService _neo4jService
+
+<PageTitle>Search Good Works - Charity Rabbit</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+    <MudPaper Elevation="4" Class="pa-4">
+        <MudText Typo="Typo.h4" GutterBottom="true">Find Good Works</MudText>
+        
+        <MudGrid>
+            <!-- Search Filters -->
+            <MudItem xs="12" md="3">
+                <MudPaper Elevation="2" Class="pa-3">
+                    <MudText Typo="Typo.h6" GutterBottom="true">Filters</MudText>
+                    
+                    <!-- Category -->
+                    <MudSelect @bind-Value="searchCriteria.Category" Label="Category" Clearable="true" Class="mb-3">
+                        <MudSelectItem Value="@("Food Bank")">Food Bank</MudSelectItem>
+                        <MudSelectItem Value="@("Homeless Shelter")">Homeless Shelter</MudSelectItem>
+                        <MudSelectItem Value="@("Environmental")">Environmental</MudSelectItem>
+                        <MudSelectItem Value="@("Education")">Education</MudSelectItem>
+                        <MudSelectItem Value="@("Healthcare")">Healthcare</MudSelectItem>
+                        <MudSelectItem Value="@("Animal Welfare")">Animal Welfare</MudSelectItem>
+                        <MudSelectItem Value="@("Community Service")">Community Service</MudSelectItem>
+                        <MudSelectItem Value="@("Youth Programs")">Youth Programs</MudSelectItem>
+                        <MudSelectItem Value="@("Senior Care")">Senior Care</MudSelectItem>
+                        <MudSelectItem Value="@("Disaster Relief")">Disaster Relief</MudSelectItem>
+                    </MudSelect>
+
+                    <!-- Effort Level -->
+                    <MudSelect @bind-Value="searchCriteria.EffortLevel" Label="Effort Level" Clearable="true" Class="mb-3">
+                        <MudSelectItem Value="@("Light")">Light</MudSelectItem>
+                        <MudSelectItem Value="@("Moderate")">Moderate</MudSelectItem>
+                        <MudSelectItem Value="@("Heavy")">Heavy</MudSelectItem>
+                    </MudSelect>
+
+                    <!-- Date Range -->
+                    <MudDatePicker @bind-Date="startDateFrom" Label="Start Date From" Class="mb-3" />
+                    <MudDatePicker @bind-Date="startDateTo" Label="Start Date To" Class="mb-3" />
+
+                    <!-- Location Search -->
+                    <MudTextField @bind-Value="zipCode" Label="Zip Code" Class="mb-3" />
+                    <MudNumericField @bind-Value="searchRadius" Label="Search Radius (miles)" Min="1" Max="100" Class="mb-3" />
+
+                    <!-- Checkboxes -->
+                    <MudCheckBox @bind-Value="searchCriteria.IsVirtual" Label="Virtual Only" Class="mb-2" />
+                    <MudCheckBox @bind-Value="searchCriteria.IsAccessible" Label="Wheelchair Accessible" Class="mb-2" />
+                    <MudCheckBox @bind-Value="searchCriteria.FamilyFriendly" Label="Family Friendly" Class="mb-2" />
+                    <MudCheckBox @bind-Value="availableSpotsOnly" Label="Available Spots Only" Class="mb-3" />
+
+                    <!-- Action Buttons -->
+                    <MudButton Variant="Variant.Filled" 
+                             Color="Color.Primary" 
+                             FullWidth="true"
+                             StartIcon="@Icons.Material.Filled.Search"
+                             OnClick="PerformSearch"
+                             Class="mb-2">
+                        Search
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" 
+                             Color="Color.Secondary" 
+                             FullWidth="true"
+                             OnClick="ClearFilters">
+                        Clear Filters
+                    </MudButton>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Results -->
+            <MudItem xs="12" md="9">
+                @if (isLoading)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                }
+                else if (searchResults == null)
+                {
+                    <MudPaper Elevation="0" Class="pa-4 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Large" Color="Color.Primary" />
+                        <MudText Typo="Typo.h6" Class="mt-2">Use filters to search for good works</MudText>
+                    </MudPaper>
+                }
+                else if (!searchResults.Any())
+                {
+                    <MudPaper Elevation="0" Class="pa-4 text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+                        <MudText Typo="Typo.h6" Class="mt-2">No results found</MudText>
+                        <MudText Typo="Typo.body2">Try adjusting your search criteria</MudText>
+                    </MudPaper>
+                }
+                else
+                {
+                    <MudText Typo="Typo.h6" Class="mb-3">Found @searchResults.Count opportunities</MudText>
+                    
+                    <MudGrid>
+                        @foreach (var goodWork in searchResults)
+                        {
+                            <MudItem xs="12" sm="6" lg="4">
+                                <MudCard>
+                                    <MudCardHeader>
+                                        <CardHeaderContent>
+                                            <MudText Typo="Typo.h6">@goodWork.Name</MudText>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">@goodWork.Category</MudChip>
+                                        </CardHeaderContent>
+                                    </MudCardHeader>
+                                    <MudCardContent>
+                                        <MudText Typo="Typo.body2" Class="mb-2">
+                                            @(goodWork.Description.Length > 120 
+                                                ? goodWork.Description.Substring(0, 120) + "..." 
+                                                : goodWork.Description)
+                                        </MudText>
+                                        
+                                        @if (goodWork.StartTime.HasValue)
+                                        {
+                                            <MudText Typo="Typo.caption" Class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
+                                                @goodWork.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                            </MudText>
+                                        }
+
+                                        @if (!string.IsNullOrEmpty(goodWork.Address))
+                                        {
+                                            <MudText Typo="Typo.caption" Class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Class="mr-1" />
+                                                @goodWork.Address
+                                            </MudText>
+                                        }
+
+                                        <div class="d-flex flex-wrap gap-2 mt-2">
+                                            <MudChip T="string" Size="Size.Small" Icon="@Icons.Material.Filled.FitnessCenter">
+                                                @goodWork.EffortLevel
+                                            </MudChip>
+                                            @if (goodWork.IsVirtual)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Info">Virtual</MudChip>
+                                            }
+                                            @if (goodWork.FamilyFriendly)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Success">Family Friendly</MudChip>
+                                            }
+                                        </div>
+
+                                        @if (goodWork.MaxParticipants.HasValue)
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Primary" Class="mt-2">
+                                                @goodWork.SignedUpCount / @goodWork.MaxParticipants spots filled
+                                            </MudText>
+                                        }
+                                    </MudCardContent>
+                                    <MudCardActions>
+                                        <MudButton Variant="Variant.Text" 
+                                                 Color="Color.Primary"
+                                                 Href="@($"/goodwork/{goodWork.Id}")">
+                                            View Details
+                                        </MudButton>
+                                    </MudCardActions>
+                                </MudCard>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private GoodWorksSearchCriteria searchCriteria = new();
+    private List<GoodWorksModel>? searchResults;
+    private bool isLoading = false;
+    
+    private DateTime? startDateFrom;
+    private DateTime? startDateTo;
+    private string? zipCode;
+    private double searchRadius = 25;
+    private bool availableSpotsOnly = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Optionally perform initial search with no filters
+        // await PerformSearch();
+    }
+
+    private async Task PerformSearch()
+    {
+        isLoading = true;
+        
+        // Map UI fields to search criteria
+        searchCriteria.StartDateFrom = startDateFrom;
+        searchCriteria.StartDateTo = startDateTo;
+        searchCriteria.HasAvailableSpots = availableSpotsOnly;
+
+        // TODO: If zipCode provided, geocode it to get lat/lon
+        // For now, you'd need to add geocoding logic
+        if (!string.IsNullOrEmpty(zipCode))
+        {
+            // searchCriteria.CenterLatitude = ...;
+            // searchCriteria.CenterLongitude = ...;
+            // searchCriteria.RadiusMiles = searchRadius;
+        }
+
+        searchResults = await _neo4jService.SearchGoodWorksAsync(searchCriteria);
+        isLoading = false;
+    }
+
+    private void ClearFilters()
+    {
+        searchCriteria = new GoodWorksSearchCriteria();
+        startDateFrom = null;
+        startDateTo = null;
+        zipCode = null;
+        searchRadius = 25;
+        availableSpotsOnly = false;
+        searchResults = null;
+    }
+}

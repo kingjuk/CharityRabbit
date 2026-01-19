@@ -1,0 +1,443 @@
+@page "/goodwork/{id:long}"
+@using CharityRabbit.Models
+@using System.Security.Claims
+@inject Neo4jService _neo4jService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>@(goodWork?.Name ?? "Good Work Details") - Charity Rabbit</PageTitle>
+
+@if (goodWork == null)
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+        <MudProgressCircular Indeterminate="true" />
+        <MudText>Loading...</MudText>
+    </MudContainer>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+        <!-- Header Section -->
+        <MudPaper Elevation="4" Class="pa-6 mb-4">
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudText Typo="Typo.h3" GutterBottom="true">@goodWork.Name</MudText>
+                    
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <MudChip T="string"  Color="Color.Primary" Icon="@Icons.Material.Filled.Category">
+                            @goodWork.Category
+                        </MudChip>
+                        @if (!string.IsNullOrEmpty(goodWork.SubCategory))
+                        {
+                            <MudChip T="string" Color="Color.Secondary">@goodWork.SubCategory</MudChip>
+                        }
+                        <MudChip T="string" Color="Color.Info" Icon="@Icons.Material.Filled.FitnessCenter">
+                            @goodWork.EffortLevel
+                        </MudChip>
+                        @if (goodWork.IsVirtual)
+                        {
+                            <MudChip T="string"  Color="Color.Success" Icon="@Icons.Material.Filled.Computer">Virtual</MudChip>
+                        }
+                        @if (goodWork.FamilyFriendly)
+                        {
+                            <MudChip T="string" Color="Color.Warning" Icon="@Icons.Material.Filled.FamilyRestroom">Family Friendly</MudChip>
+                        }
+                        @if (goodWork.IsAccessible)
+                        {
+                            <MudChip T="string"  Color="Color.Tertiary" Icon="@Icons.Material.Filled.Accessible">Accessible</MudChip>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(goodWork.Status) && goodWork.Status != "Active")
+                    {
+                        <MudAlert Severity="Severity.Warning" Class="mt-2">Status: @goodWork.Status</MudAlert>
+                    }
+                </MudItem>
+
+                <MudItem xs="12" md="4" Class="d-flex flex-column align-end">
+                    @if (goodWork.MaxParticipants.HasValue)
+                    {
+                        <MudText Typo="Typo.h6" Color="Color.Primary">
+                            @goodWork.SignedUpCount / @goodWork.MaxParticipants spots filled
+                        </MudText>
+                        <MudProgressLinear Color="Color.Primary" 
+                                         Value="@((double)goodWork.SignedUpCount / goodWork.MaxParticipants.Value * 100)" 
+                                         Class="my-2" />
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.h6" Color="Color.Primary">
+                            @goodWork.SignedUpCount participants
+                        </MudText>
+                    }
+
+                    <MudText Typo="Typo.body2" Class="mb-2">
+                        @goodWork.InterestedCount people interested
+                    </MudText>
+
+                    <MudButtonGroup Variant="Variant.Filled" Class="mt-2">
+                        <MudButton Color="@(goodWork.IsUserInterested ? Color.Primary : Color.Default)"
+                                   StartIcon="@Icons.Material.Filled.Star"
+                                   OnClick="ToggleInterested"
+                                   Disabled="@(!isAuthenticated)">
+                            @(goodWork.IsUserInterested ? "Interested" : "Mark Interested")
+                        </MudButton>
+                        <MudButton Color="@(goodWork.IsUserSignedUp ? Color.Success : Color.Primary)"
+                                   StartIcon="@Icons.Material.Filled.CheckCircle"
+                                   OnClick="ToggleSignUp"
+                                   Disabled="@(!isAuthenticated || (goodWork.MaxParticipants.HasValue && goodWork.SignedUpCount >= goodWork.MaxParticipants.Value))">
+                            @(goodWork.IsUserSignedUp ? "Signed Up" : "Sign Up")
+                        </MudButton>
+                    </MudButtonGroup>
+
+                    @if (!isAuthenticated)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error" Class="mt-2">
+                            Please log in to interact
+                        </MudText>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <MudGrid>
+            <!-- Left Column: Details -->
+            <MudItem xs="12" md="8">
+                <!-- Description -->
+                <MudPaper Elevation="2" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h5" GutterBottom="true">Description</MudText>
+                    <MudText Typo="Typo.body1" Class="mb-2">@goodWork.Description</MudText>
+                    @if (!string.IsNullOrEmpty(goodWork.DetailedDescription))
+                    {
+                        <MudDivider Class="my-3" />
+                        <MudText Typo="Typo.body2">@goodWork.DetailedDescription</MudText>
+                    }
+                </MudPaper>
+
+                <!-- Date & Time -->
+                <MudPaper Elevation="2" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h5" GutterBottom="true">
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" /> When
+                    </MudText>
+                    <MudGrid>
+                        @if (goodWork.StartTime.HasValue)
+                        {
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.subtitle2">Start</MudText>
+                                <MudText Typo="Typo.body1">@goodWork.StartTime.Value.ToString("f")</MudText>
+                            </MudItem>
+                        }
+                        @if (goodWork.EndTime.HasValue)
+                        {
+                            <MudItem xs="6">
+                                <MudText Typo="Typo.subtitle2">End</MudText>
+                                <MudText Typo="Typo.body1">@goodWork.EndTime.Value.ToString("f")</MudText>
+                            </MudItem>
+                        }
+                        @if (goodWork.EstimatedDuration.HasValue)
+                        {
+                            <MudItem xs="12">
+                                <MudText Typo="Typo.subtitle2">Duration</MudText>
+                                <MudText Typo="Typo.body1">@FormatDuration(goodWork.EstimatedDuration.Value)</MudText>
+                            </MudItem>
+                        }
+                    </MudGrid>
+
+                    @if (goodWork.IsRecurring)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mt-3">
+                            <MudText><strong>Recurring Event:</strong> @goodWork.RecurrencePattern</MudText>
+                        </MudAlert>
+                    }
+                </MudPaper>
+
+                <!-- Location -->
+                @if (!goodWork.IsVirtual)
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h5" GutterBottom="true">
+                            <MudIcon Icon="@Icons.Material.Filled.LocationOn" /> Location
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(goodWork.Address))
+                        {
+                            <MudText Typo="Typo.body1" Class="mb-2">@goodWork.Address</MudText>
+                        }
+                        
+                        <MudGrid>
+                            @if (goodWork.ParkingAvailable)
+                            {
+                                <MudItem xs="6">
+                                    <MudChip T="string" Icon="@Icons.Material.Filled.LocalParking" Color="Color.Success">Parking Available</MudChip>
+                                </MudItem>
+                            }
+                            @if (goodWork.PublicTransitAccessible)
+                            {
+                                <MudItem xs="6">
+                                    <MudChip T="string" Icon="@Icons.Material.Filled.DirectionsBus" Color="Color.Success">Transit Accessible</MudChip>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                    </MudPaper>
+                }
+
+                <!-- Impact -->
+                @if (!string.IsNullOrEmpty(goodWork.ImpactDescription) || goodWork.EstimatedPeopleHelped.HasValue)
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h5" GutterBottom="true">
+                            <MudIcon Icon="@Icons.Material.Filled.Favorite" /> Impact
+                        </MudText>
+                        @if (!string.IsNullOrEmpty(goodWork.ImpactDescription))
+                        {
+                            <MudText Typo="Typo.body1" Class="mb-2">@goodWork.ImpactDescription</MudText>
+                        }
+                        @if (goodWork.EstimatedPeopleHelped.HasValue)
+                        {
+                            <MudAlert Severity="Severity.Success">
+                                Estimated to help <strong>@goodWork.EstimatedPeopleHelped</strong> people
+                            </MudAlert>
+                        }
+                    </MudPaper>
+                }
+
+                <!-- Requirements -->
+                @if ((goodWork.RequiredSkills?.Any() ?? false) || goodWork.MinimumAge.HasValue || (goodWork.WhatToBring?.Any() ?? false))
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h5" GutterBottom="true">
+                            <MudIcon Icon="@Icons.Material.Filled.Checklist" /> Requirements & What to Bring
+                        </MudText>
+                        
+                        @if (goodWork.MinimumAge.HasValue)
+                        {
+                            <MudText Typo="Typo.body1" Class="mb-2">
+                                <strong>Minimum Age:</strong> @goodWork.MinimumAge years
+                            </MudText>
+                        }
+
+                        @if (goodWork.RequiredSkills?.Any() ?? false)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mt-2">Skills Needed:</MudText>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                @foreach (var skill in goodWork.RequiredSkills)
+                                {
+                                    <MudChip T="string" Icon="@Icons.Material.Filled.Build">@skill</MudChip>
+                                }
+                            </div>
+                        }
+
+                        @if (goodWork.WhatToBring?.Any() ?? false)
+                        {
+                            <MudText Typo="Typo.subtitle2" Class="mt-3">What to Bring:</MudText>
+                            <MudList T="string" Dense="true">
+                                @foreach (var item in goodWork.WhatToBring)
+                                {
+                                    <MudListItem Icon="@Icons.Material.Filled.CheckCircleOutline">@item</MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudPaper>
+                }
+
+                <!-- Special Instructions -->
+                @if (!string.IsNullOrEmpty(goodWork.SpecialInstructions))
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h5" GutterBottom="true">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" /> Special Instructions
+                        </MudText>
+                        <MudText Typo="Typo.body1">@goodWork.SpecialInstructions</MudText>
+                    </MudPaper>
+                }
+            </MudItem>
+
+            <!-- Right Column: Sidebar -->
+            <MudItem xs="12" md="4">
+                <!-- Contact Information -->
+                <MudPaper Elevation="2" Class="pa-4 mb-4">
+                    <MudText Typo="Typo.h5" GutterBottom="true">
+                        <MudIcon Icon="@Icons.Material.Filled.ContactMail" /> Contact
+                    </MudText>
+                    <MudText Typo="Typo.body1"><strong>@goodWork.ContactName</strong></MudText>
+                    <MudText Typo="Typo.body2">
+                        <MudLink Href="@($"mailto:{goodWork.ContactEmail}")">@goodWork.ContactEmail</MudLink>
+                    </MudText>
+                    @if (!string.IsNullOrEmpty(goodWork.ContactPhone))
+                    {
+                        <MudText Typo="Typo.body2">
+                            <MudLink Href="@($"tel:{goodWork.ContactPhone}")">@goodWork.ContactPhone</MudLink>
+                        </MudText>
+                    }
+                </MudPaper>
+
+                <!-- Organization -->
+                @if (!string.IsNullOrEmpty(goodWork.OrganizationName))
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h5" GutterBottom="true">
+                            <MudIcon Icon="@Icons.Material.Filled.Business" /> Organization
+                        </MudText>
+                        <MudText Typo="Typo.body1"><strong>@goodWork.OrganizationName</strong></MudText>
+                        @if (!string.IsNullOrEmpty(goodWork.OrganizationWebsite))
+                        {
+                            <MudLink Href="@goodWork.OrganizationWebsite" Target="_blank">
+                                Visit Website
+                            </MudLink>
+                        }
+                    </MudPaper>
+                }
+
+                <!-- Tags -->
+                @if (goodWork.Tags?.Any() ?? false)
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h5" GutterBottom="true">Tags</MudText>
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var tag in goodWork.Tags)
+                            {
+                                <MudChip T="string" Size="Size.Small">@tag</MudChip>
+                            }
+                        </div>
+                    </MudPaper>
+                }
+
+                <!-- Weather Info -->
+                @if (goodWork.OutdoorActivity || goodWork.WeatherDependent)
+                {
+                    <MudPaper Elevation="2" Class="pa-4 mb-4">
+                        <MudText Typo="Typo.h5" GutterBottom="true">
+                            <MudIcon Icon="@Icons.Material.Filled.Cloud" /> Weather Info
+                        </MudText>
+                        @if (goodWork.OutdoorActivity)
+                        {
+                            <MudChip T="string"  Icon="@Icons.Material.Filled.Park" Color="Color.Info" Class="mb-2">Outdoor Activity</MudChip>
+                        }
+                        @if (goodWork.WeatherDependent)
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true">
+                                This event may be affected by weather conditions
+                            </MudAlert>
+                        }
+                    </MudPaper>
+                }
+            </MudItem>
+        </MudGrid>
+
+        <!-- Similar Good Works -->
+        @if (similarGoodWorks?.Any() ?? false)
+        {
+            <MudPaper Elevation="2" Class="pa-4 mt-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">
+                    <MudIcon Icon="@Icons.Material.Filled.Explore" /> Similar Opportunities
+                </MudText>
+                <MudGrid>
+                    @foreach (var similar in similarGoodWorks.Take(6))
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6">@similar.Name</MudText>
+                                    <MudText Typo="Typo.body2" Class="mb-2">@similar.Category</MudText>
+                                    <MudText Typo="Typo.caption">
+                                        @if (similar.StartTime.HasValue)
+                                        {
+                                            @similar.StartTime.Value.ToString("MMM dd, yyyy")
+                                        }
+                                    </MudText>
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" 
+                                             Href="@($"/goodwork/{similar.Id}")">
+                                        View Details
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        }
+
+        <!-- Back Button -->
+        <MudButton Variant="Variant.Filled" 
+                   StartIcon="@Icons.Material.Filled.ArrowBack" 
+                   Color="Color.Default" 
+                   Class="mt-4"
+                   OnClick="@(() => Navigation.NavigateTo("/"))">
+            Back to List
+        </MudButton>
+    </MudContainer>
+}
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private GoodWorksModel? goodWork;
+    private List<GoodWorksModel>? similarGoodWorks;
+    private bool isAuthenticated = false;
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+        
+        if (isAuthenticated)
+        {
+            userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        }
+
+        await LoadGoodWork();
+        await LoadSimilarGoodWorks();
+    }
+
+    private async Task LoadGoodWork()
+    {
+        goodWork = await _neo4jService.GetGoodWorkByIdAsync(Id, userId);
+    }
+
+    private async Task LoadSimilarGoodWorks()
+    {
+        if (goodWork != null)
+        {
+            similarGoodWorks = await _neo4jService.GetSimilarGoodWorksAsync(Id, userId);
+        }
+    }
+
+    private async Task ToggleInterested()
+    {
+        if (!isAuthenticated || string.IsNullOrEmpty(userId) || goodWork == null) return;
+
+        goodWork.IsUserInterested = !goodWork.IsUserInterested;
+        await _neo4jService.MarkUserInterestedAsync(userId, Id, goodWork.IsUserInterested);
+        
+        // Reload to get updated counts
+        await LoadGoodWork();
+    }
+
+    private async Task ToggleSignUp()
+    {
+        if (!isAuthenticated || string.IsNullOrEmpty(userId) || goodWork == null) return;
+
+        // Check capacity
+        if (!goodWork.IsUserSignedUp && goodWork.MaxParticipants.HasValue && 
+            goodWork.SignedUpCount >= goodWork.MaxParticipants.Value)
+        {
+            return; // Event is full
+        }
+
+        goodWork.IsUserSignedUp = !goodWork.IsUserSignedUp;
+        await _neo4jService.SignUpUserAsync(userId, Id, goodWork.IsUserSignedUp);
+        
+        // Reload to get updated counts
+        await LoadGoodWork();
+    }
+
+    private string FormatDuration(TimeSpan duration)
+    {
+        if (duration.TotalHours >= 1)
+            return $"{duration.Hours}h {duration.Minutes}m";
+        return $"{duration.Minutes} minutes";
+    }
+}

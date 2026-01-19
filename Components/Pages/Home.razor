@@ -82,13 +82,25 @@
             </ToolBarContent>
 
             <Columns>
-                <PropertyColumn Property="x => x.Name" Title="Name" Filterable="false" />
+                <PropertyColumn Property="x => x.Name" Title="Name" Filterable="false">
+                    <CellTemplate>
+                        <MudLink Href="@($"/goodwork/{context.Item.Id}")">@context.Item.Name</MudLink>
+                    </CellTemplate>
+                </PropertyColumn>
                 <PropertyColumn Property="x => x.Category" Title="Category" Filterable="false" />
                 <PropertyColumn Property="x => x.EffortLevel" Title="Effort Level" Filterable="false" />
                 <PropertyColumn Property="x => x.ContactName" Title="Contact" Filterable="false" />
                 <PropertyColumn Property="x => x.ContactEmail" Title="Email" Filterable="false" />
                 <PropertyColumn Property="x => x.StartTime" Title="Start Time" Filterable="false" />
                 <PropertyColumn Property="x => x.EndTime" Title="End Time" Filterable="false" />
+                <TemplateColumn Title="Actions" Filterable="false">
+                    <CellTemplate>
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                     Color="Color.Primary" 
+                                     Size="Size.Small"
+                                     Href="@($"/goodwork/{context.Item.Id}")" />
+                    </CellTemplate>
+                </TemplateColumn>
             </Columns>
 
             <PagerContent>

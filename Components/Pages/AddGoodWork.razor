@@ -123,7 +123,7 @@
         _mapOptions = new MapOptions
             {
                 Zoom = 10,
-                Center = new LatLngLiteral { Lat = 34.7304, Lng = -86.5861 }, // Default location
+                Center = new LatLngLiteral(34.7304, -86.5861), // Default location
                 MapTypeId = MapTypeId.Roadmap
             };
     }
@@ -157,7 +157,7 @@
 
     private async Task UpdateMapLocation(double latitude, double longitude)
     {
-        var position = new LatLngLiteral { Lat = latitude, Lng = longitude };
+        var position = new LatLngLiteral(latitude, longitude);
 
         // Center the map on the new location
         await _map.InteropObject.SetCenter(position);
