@@ -8,6 +8,53 @@
 <PageTitle>Charity Rabbit - Make a Difference</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4 mt-4">
+
+    <!-- Bible Verse Carousel -->
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudCarousel Class="mud-width-full" Style="height:140px;" ShowArrows="true" ShowBullets="false"
+                     EnableSwipeGesture="true" AutoCycle="true" TData="object">
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Ephesians 2:10 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "For we are God's handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Galatians 6:9 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Matthew 5:16 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Hebrews 10:24 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "And let us consider how we may spur one another on toward love and good deeds."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">James 2:17 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "In the same way, faith by itself, if it is not accompanied by action, is dead."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+        </MudCarousel>
+    </MudPaper>
     <!-- Welcome Hero Section -->
     <MudPaper Elevation="4" Class="pa-6 mb-4 text-center" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
         <MudText Typo="Typo.h3" Class="mb-2">
@@ -56,7 +103,7 @@
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
                 <MudPaper Elevation="2" Class="pa-4 text-center">
-                    <div style="font-size: 48px;">🥕</div>
+                    <div style="font-size: 40px; height: 40px; line-height: 40px;">🥕</div>
                     <MudText Typo="Typo.h4" Color="Color.Warning">@totalCarrots</MudText>
                     <MudText Typo="Typo.body2">Carrots Earned</MudText>
                 </MudPaper>
@@ -338,52 +385,7 @@
         </MudPaper>
     }
 
-    <!-- Bible Verse Carousel -->
-    <MudPaper Elevation="2" Class="pa-4 mb-4">
-        <MudCarousel Class="mud-width-full" Style="height:140px;" ShowArrows="true" ShowBullets="false" 
-                   EnableSwipeGesture="true" AutoCycle="true" TData="object">
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Ephesians 2:10 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "For we are God's handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Galatians 6:9 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Matthew 5:16 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Hebrews 10:24 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "And let us consider how we may spur one another on toward love and good deeds."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">James 2:17 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "In the same way, faith by itself, if it is not accompanied by action, is dead."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-        </MudCarousel>
-    </MudPaper>
+
 
     <!-- Quick Actions -->
     <MudPaper Elevation="2" Class="pa-4">

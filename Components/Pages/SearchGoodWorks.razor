@@ -328,7 +328,7 @@
         isLoading = true;
 
         // Set date range to next 3 months
-        startDateFrom = DateTime.Today;
+        startDateFrom = DateTime.Today.Subtract(TimeSpan.FromDays(10));
         startDateTo = DateTime.Today.AddMonths(3);
 
         searchCriteria.StartDateFrom = startDateFrom;

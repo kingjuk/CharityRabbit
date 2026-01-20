@@ -366,10 +366,12 @@ public class Neo4jService : IDisposable
         return goodWorks;
     }
 
-    public async Task MarkUserInterestedAsync(string userId, long goodWorkId, bool interested)
+    public async Task MarkUserInterestedAsync(string userId, long goodWorkId, bool interested, string? userName = null, string? userEmail = null)
     {
         var query = interested
             ? @"MERGE (u:User {userId: $userId})
+                ON CREATE SET u.name = $userName, u.email = $userEmail
+                ON MATCH SET u.name = coalesce(u.name, $userName), u.email = coalesce(u.email, $userEmail)
                 WITH u
                 MATCH (g:GoodWork) WHERE id(g) = $goodWorkId
                 MERGE (u)-[r:INTERESTED_IN]->(g)
@@ -381,13 +383,15 @@ public class Neo4jService : IDisposable
                 RETURN count(r) AS count";
 
         using var session = _driver.AsyncSession();
-        await session.RunAsync(query, new { userId, goodWorkId });
+        await session.RunAsync(query, new { userId, goodWorkId, userName, userEmail });
     }
 
-    public async Task SignUpUserAsync(string userId, long goodWorkId, bool signUp)
+    public async Task SignUpUserAsync(string userId, long goodWorkId, bool signUp, string? userName = null, string? userEmail = null)
     {
         var query = signUp
             ? @"MERGE (u:User {userId: $userId})
+                ON CREATE SET u.name = $userName, u.email = $userEmail
+                ON MATCH SET u.name = coalesce(u.name, $userName), u.email = coalesce(u.email, $userEmail)
                 WITH u
                 MATCH (g:GoodWork) WHERE id(g) = $goodWorkId
                 MERGE (u)-[r:SIGNED_UP_FOR]->(g)
@@ -404,7 +408,7 @@ public class Neo4jService : IDisposable
                 RETURN g.currentParticipants AS count";
 
         using var session = _driver.AsyncSession();
-        await session.RunAsync(query, new { userId, goodWorkId });
+        await session.RunAsync(query, new { userId, goodWorkId, userName, userEmail });
     }
 
     public async Task<List<GoodWorksModel>> GetUserInterestedGoodWorksAsync(string userId)
@@ -1163,6 +1167,61 @@ public class Neo4jService : IDisposable
         });
 
         return doGooders;
+    }
+
+    public async Task<List<ParticipantModel>> GetGoodWorkParticipantsAsync(long goodWorkId)
+    {
+        var query = @"
+            MATCH (g:GoodWork)
+            WHERE id(g) = $goodWorkId
+            OPTIONAL MATCH (u:User)-[r:SIGNED_UP_FOR|INTERESTED_IN]->(g)
+            WHERE r IS NOT NULL
+            RETURN u.userId AS userId,
+                   coalesce(u.name, u.email, 'Anonymous User') AS name,
+                   u.email AS email,
+                   u.phone AS phone,
+                   type(r) AS relationshipType,
+                   r.timestamp AS engagementDate
+            ORDER BY relationshipType DESC, engagementDate DESC";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, new { goodWorkId });
+
+        var participants = new List<ParticipantModel>();
+        await result.ForEachAsync(record =>
+        {
+            // Only add if we have a userId (meaning there's actually a relationship)
+            var userId = record["userId"].As<string?>();
+            if (!string.IsNullOrEmpty(userId))
+            {
+                var engagementDateValue = record["engagementDate"];
+                DateTime engagementDate = DateTime.UtcNow;
+                
+                if (engagementDateValue != null && (engagementDateValue is not null))
+                {
+                    try
+                    {
+                        engagementDate = engagementDateValue.As<ZonedDateTime>().ToDateTimeOffset().DateTime;
+                    }
+                    catch
+                    {
+                        engagementDate = DateTime.UtcNow;
+                    }
+                }
+
+                participants.Add(new ParticipantModel
+                {
+                    UserId = userId,
+                    Name = record["name"].As<string>(),
+                    Email = record["email"].As<string?>() ?? string.Empty,
+                    Phone = record["phone"].As<string?>(),
+                    RelationshipType = record["relationshipType"].As<string>(),
+                    EngagementDate = engagementDate
+                });
+            }
+        });
+
+        return participants;
     }
 
     public void Dispose()

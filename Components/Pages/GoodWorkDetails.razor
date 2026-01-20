@@ -1,9 +1,11 @@
 @page "/goodwork/{id:long}"
 @using CharityRabbit.Models
+@using CharityRabbit.Data
 @using System.Security.Claims
 @inject Neo4jService _neo4jService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject RecurringEventService _recurringEventService
 
 <PageTitle>@(goodWork?.Name ?? "Good Work Details") - Charity Rabbit</PageTitle>
 
@@ -147,6 +149,28 @@ else
                     {
                         <MudAlert Severity="Severity.Info" Class="mt-3">
                             <MudText><strong>Recurring Event:</strong> @goodWork.RecurrencePattern</MudText>
+                            <MudText Typo="Typo.body2" Class="mt-2">@_recurringEventService.FormatRecurrencePattern(goodWork.RecurrencePattern)</MudText>
+                            
+                            @if (upcomingOccurrences != null && upcomingOccurrences.Any())
+                            {
+                                <MudDivider Class="my-2" />
+                                <MudText Typo="Typo.subtitle2" Class="mt-2">Upcoming Occurrences:</MudText>
+                                <MudList T="DateTime" Dense="true">
+                                    @foreach (var occurrence in upcomingOccurrences.Take(5))
+                                    {
+                                        <MudListItem Icon="@Icons.Material.Filled.Event">
+                                            @occurrence.ToString("dddd, MMM dd, yyyy h:mm tt")
+                                        </MudListItem>
+                                    }
+                                </MudList>
+                            }
+                            
+                            @if (goodWork.RecurrenceEndDate.HasValue)
+                            {
+                                <MudText Typo="Typo.caption" Class="mt-2">
+                                    Repeats until: @goodWork.RecurrenceEndDate.Value.ToString("MMM dd, yyyy")
+                                </MudText>
+                            }
                         </MudAlert>
                     }
                 </MudPaper>
@@ -375,8 +399,11 @@ else
 
     private GoodWorksModel? goodWork;
     private List<GoodWorksModel>? similarGoodWorks;
+    private List<DateTime>? upcomingOccurrences;
     private bool isAuthenticated = false;
     private string? userId;
+    private string? userName;
+    private string? userEmail;
 
     protected override async Task OnInitializedAsync()
     {
@@ -386,6 +413,16 @@ else
         if (isAuthenticated)
         {
             userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            
+            // Try multiple claim types for name
+            userName = authState.User.FindFirst(ClaimTypes.Name)?.Value 
+                ?? authState.User.FindFirst("name")?.Value
+                ?? authState.User.FindFirst(ClaimTypes.GivenName)?.Value;
+            
+            // Try multiple claim types for email
+            userEmail = authState.User.FindFirst(ClaimTypes.Email)?.Value 
+                ?? authState.User.FindFirst("emailaddress")?.Value
+                ?? authState.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
         }
 
         await LoadGoodWork();
@@ -395,6 +432,12 @@ else
     private async Task LoadGoodWork()
     {
         goodWork = await _neo4jService.GetGoodWorkByIdAsync(Id, userId);
+        
+        // Load upcoming occurrences for recurring events
+        if (goodWork?.IsRecurring == true)
+        {
+            upcomingOccurrences = _recurringEventService.GetUpcomingOccurrences(goodWork, 10);
+        }
     }
 
     private async Task LoadSimilarGoodWorks()
@@ -410,7 +453,7 @@ else
         if (!isAuthenticated || string.IsNullOrEmpty(userId) || goodWork == null) return;
 
         goodWork.IsUserInterested = !goodWork.IsUserInterested;
-        await _neo4jService.MarkUserInterestedAsync(userId, Id, goodWork.IsUserInterested);
+        await _neo4jService.MarkUserInterestedAsync(userId, Id, goodWork.IsUserInterested, userName, userEmail);
         
         // Reload to get updated counts
         await LoadGoodWork();
@@ -428,7 +471,7 @@ else
         }
 
         goodWork.IsUserSignedUp = !goodWork.IsUserSignedUp;
-        await _neo4jService.SignUpUserAsync(userId, Id, goodWork.IsUserSignedUp);
+        await _neo4jService.SignUpUserAsync(userId, Id, goodWork.IsUserSignedUp, userName, userEmail);
         
         // Reload to get updated counts
         await LoadGoodWork();
@@ -437,7 +480,12 @@ else
     private string FormatDuration(TimeSpan duration)
     {
         if (duration.TotalHours >= 1)
-            return $"{duration.Hours}h {duration.Minutes}m";
-        return $"{duration.Minutes} minutes";
+        {
+            return $"{(int)duration.TotalHours}h {duration.Minutes}m";
+        }
+        else
+        {
+            return $"{duration.Minutes}m";
+        }
     }
 }

@@ -31,6 +31,7 @@ internal class Program
         builder.Services.AddHttpClient<GeocodingService>();
         builder.Services.AddSingleton<GooglePlacesService>();
         builder.Services.AddScoped<TestDataService>();
+        builder.Services.AddScoped<RecurringEventService>();
 
         var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"] ?? throw new InvalidOperationException("GoogleMaps API key is missing in configuration.");
 

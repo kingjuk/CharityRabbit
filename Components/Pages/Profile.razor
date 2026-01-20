@@ -1,10 +1,12 @@
-@page "/profile"
+﻿@page "/profile"
 @using CharityRabbit.Models
+@using CharityRabbit.Data
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
 @inject Neo4jService _neo4jService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject RecurringEventService _recurringEventService
 @attribute [Authorize]
 
 <PageTitle>My Profile - Charity Rabbit</PageTitle>
@@ -30,13 +32,13 @@
                 <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Class="mb-2" />
                 <MudText Typo="Typo.h4">@(signedUpGoodWorks?.Count ?? 0)</MudText>
                 <MudText Typo="Typo.body1">Events Signed Up</MudText>
-                <MudText Typo="Typo.caption">? @((signedUpGoodWorks?.Count ?? 0) * 3) carrots</MudText>
+                <MudText Typo="Typo.caption">🥕 @((signedUpGoodWorks?.Count ?? 0) * 3) carrots</MudText>
             </MudItem>
             <MudItem xs="12" sm="4" Class="text-center">
                 <MudIcon Icon="@Icons.Material.Filled.Create" Size="Size.Large" Class="mb-2" />
                 <MudText Typo="Typo.h4">@(createdGoodWorks?.Count ?? 0)</MudText>
                 <MudText Typo="Typo.body1">Events Created</MudText>
-                <MudText Typo="Typo.caption">? @((createdGoodWorks?.Count ?? 0) * 5) carrots</MudText>
+                <MudText Typo="Typo.caption">🥕 @((createdGoodWorks?.Count ?? 0) * 5) carrots</MudText>
             </MudItem>
         </MudGrid>
     </MudPaper>
@@ -61,21 +63,107 @@
                 <MudGrid>
                     @foreach (var work in createdGoodWorks)
                     {
-                        <MudItem xs="12" sm="6" md="4">
+                        <MudItem xs="12">
                             <MudCard>
                                 <MudCardContent>
                                     <MudText Typo="Typo.h6">@work.Name</MudText>
                                     <MudChip T="string" Size="Size.Small" Color="Color.Primary">@work.Category</MudChip>
+                                    @if (work.IsRecurring)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Repeat">
+                                            Recurring
+                                        </MudChip>
+                                    }
                                     <MudText Typo="Typo.body2" Class="mt-2">@work.Description</MudText>
                                     @if (work.StartTime.HasValue)
                                     {
                                         <MudText Typo="Typo.caption" Class="mt-2">
-                                            ?? @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                            📅 @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                        </MudText>
+                                    }
+                                    @if (work.IsRecurring && !string.IsNullOrEmpty(work.RecurrencePattern))
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Info">
+                                            🔄 @_recurringEventService.FormatRecurrencePattern(work.RecurrencePattern)
                                         </MudText>
                                     }
                                     <MudText Typo="Typo.caption">
-                                        ?? @work.SignedUpCount participants
+                                        👥 @work.SignedUpCount participants signed up
                                     </MudText>
+                                    
+                                    @if (workParticipants.ContainsKey(work.Id.Value))
+                                    {
+                                        var participants = workParticipants[work.Id.Value];
+                                        var signedUp = participants.Where(p => p.RelationshipType == "SIGNED_UP_FOR").ToList();
+                                        var interested = participants.Where(p => p.RelationshipType == "INTERESTED_IN").ToList();
+                                        
+                                        @if (signedUp.Any() || interested.Any())
+                                        {
+                                            <MudExpansionPanels Class="mt-3">
+                                                @if (signedUp.Any())
+                                                {
+                                                    <MudExpansionPanel Text="@($"Signed Up ({signedUp.Count})")">
+                                                        <MudList T="ParticipantModel" Dense="true">
+                                                            @foreach (var participant in signedUp)
+                                                            {
+                                                                <MudListItem>
+                                                                    <div>
+                                                                        <MudText Typo="Typo.body1"><strong>@participant.Name</strong></MudText>
+                                                                        <MudText Typo="Typo.body2">
+                                                                            <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" Class="mr-1" />
+                                                                            <MudLink Href="@($"mailto:{participant.Email}")">@participant.Email</MudLink>
+                                                                        </MudText>
+                                                                        @if (!string.IsNullOrEmpty(participant.Phone))
+                                                                        {
+                                                                            <MudText Typo="Typo.body2">
+                                                                                <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Class="mr-1" />
+                                                                                <MudLink Href="@($"tel:{participant.Phone}")">@participant.Phone</MudLink>
+                                                                            </MudText>
+                                                                        }
+                                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                                            Signed up: @participant.EngagementDate.ToString("MMM dd, yyyy")
+                                                                        </MudText>
+                                                                    </div>
+                                                                </MudListItem>
+                                                                <MudDivider />
+                                                            }
+                                                        </MudList>
+                                                    </MudExpansionPanel>
+                                                }
+                                                
+                                                @if (interested.Any())
+                                                {
+                                                    <MudExpansionPanel Text="@($"Interested ({interested.Count})")">
+                                                        <MudList T="ParticipantModel" Dense="true">
+                                                            @foreach (var participant in interested)
+                                                            {
+                                                                <MudListItem>
+                                                                    <div>
+                                                                        <MudText Typo="Typo.body1"><strong>@participant.Name</strong></MudText>
+                                                                        <MudText Typo="Typo.body2">
+                                                                            <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" Class="mr-1" />
+                                                                            <MudLink Href="@($"mailto:{participant.Email}")">@participant.Email</MudLink>
+                                                                        </MudText>
+                                                                        @if (!string.IsNullOrEmpty(participant.Phone))
+                                                                        {
+                                                                            <MudText Typo="Typo.body2">
+                                                                                <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" Class="mr-1" />
+                                                                                <MudLink Href="@($"tel:{participant.Phone}")">@participant.Phone</MudLink>
+                                                                            </MudText>
+                                                                        }
+                                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                                            Interested: @participant.EngagementDate.ToString("MMM dd, yyyy")
+                                                                        </MudText>
+                                                                    </div>
+                                                                </MudListItem>
+                                                                <MudDivider />
+                                                            }
+                                                        </MudList>
+                                                    </MudExpansionPanel>
+                                                }
+                                            </MudExpansionPanels>
+                                        }
+                                    }
                                 </MudCardContent>
                                 <MudCardActions>
                                     <MudButton Variant="Variant.Text" Color="Color.Primary" 
@@ -126,13 +214,13 @@
                                     @if (work.StartTime.HasValue)
                                     {
                                         <MudText Typo="Typo.caption" Class="mt-2">
-                                            ?? @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                            📅 @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
                                         </MudText>
                                     }
                                     @if (!string.IsNullOrEmpty(work.Address))
                                     {
                                         <MudText Typo="Typo.caption">
-                                            ?? @work.Address
+                                            📍 @work.Address
                                         </MudText>
                                     }
                                 </MudCardContent>
@@ -177,7 +265,7 @@
                                     @if (work.StartTime.HasValue)
                                     {
                                         <MudText Typo="Typo.caption" Class="mt-2">
-                                            ?? @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                            📅 @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
                                         </MudText>
                                     }
                                 </MudCardContent>
@@ -208,6 +296,7 @@
     private List<GoodWorksModel>? createdGoodWorks;
     private List<GoodWorksModel>? signedUpGoodWorks;
     private List<GoodWorksModel>? interestedGoodWorks;
+    private Dictionary<long, List<ParticipantModel>> workParticipants = new();
     private string? userId;
     private string? userName;
     private int totalCarrots => ((signedUpGoodWorks?.Count ?? 0) * 3) + ((createdGoodWorks?.Count ?? 0) * 5);
@@ -220,7 +309,14 @@
         if (user.Identity?.IsAuthenticated == true)
         {
             userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            userName = user.FindFirst(ClaimTypes.Name)?.Value ?? user.FindFirst(ClaimTypes.Email)?.Value;
+            
+            // Try multiple claim types for name
+            userName = user.FindFirst(ClaimTypes.Name)?.Value 
+                ?? user.FindFirst("name")?.Value
+                ?? user.FindFirst(ClaimTypes.GivenName)?.Value
+                ?? user.FindFirst(ClaimTypes.Email)?.Value
+                ?? user.FindFirst("emailaddress")?.Value
+                ?? user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value;
 
             if (!string.IsNullOrEmpty(userId))
             {
@@ -236,6 +332,19 @@
         createdGoodWorks = await _neo4jService.GetUserCreatedGoodWorksAsync(userId);
         signedUpGoodWorks = await _neo4jService.GetUserSignedUpGoodWorksAsync(userId);
         interestedGoodWorks = await _neo4jService.GetUserInterestedGoodWorksAsync(userId);
+        
+        // Load participants for each created good work
+        if (createdGoodWorks != null)
+        {
+            foreach (var work in createdGoodWorks)
+            {
+                if (work.Id.HasValue)
+                {
+                    var participants = await _neo4jService.GetGoodWorkParticipantsAsync(work.Id.Value);
+                    workParticipants[work.Id.Value] = participants;
+                }
+            }
+        }
     }
 
     private async Task ConfirmDelete(GoodWorksModel work)

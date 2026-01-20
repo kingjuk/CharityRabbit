@@ -99,6 +99,53 @@
                         <MudSwitch @bind-Value="goodWork.FamilyFriendly" Label="Family Friendly" Color="Color.Primary" />
                         <MudSwitch @bind-Value="goodWork.IsAccessible" Label="Wheelchair Accessible" Color="Color.Primary" />
 
+                        <!-- Recurring Event Options -->
+                        <MudDivider Class="my-4" />
+                        <MudText Typo="Typo.h6" Class="mb-2">Recurring Event Options</MudText>
+                        
+                        <MudSwitch @bind-Value="goodWork.IsRecurring" Label="This is a recurring event" Color="Color.Primary" />
+                        
+                        @if (goodWork.IsRecurring)
+                        {
+                            <MudSelect Label="Recurrence Pattern" @bind-Value="selectedRecurrenceType" Class="mt-3">
+                                <MudSelectItem Value="@("DAILY")">Daily</MudSelectItem>
+                                <MudSelectItem Value="@("WEEKLY")">Weekly</MudSelectItem>
+                                <MudSelectItem Value="@("MONTHLY")">Monthly</MudSelectItem>
+                                <MudSelectItem Value="@("YEARLY")">Yearly</MudSelectItem>
+                            </MudSelect>
+
+                            <MudNumericField Label="Repeat Every" @bind-Value="recurrenceInterval" 
+                                           Class="mt-3" Min="1" HideSpinButtons="false" 
+                                           HelperText="@GetIntervalHelperText()" />
+
+                            @if (selectedRecurrenceType == "WEEKLY")
+                            {
+                                <MudText Typo="Typo.subtitle2" Class="mt-3">Select Days:</MudText>
+                                <div class="d-flex flex-wrap gap-2 mt-2">
+                                    <MudChip T="string" Color="@(selectedDays.Contains(DayOfWeek.Monday) ? Color.Primary : Color.Default)" 
+                                           OnClick="@(() => ToggleDay(DayOfWeek.Monday))">Monday</MudChip>
+                                    <MudChip T="string" Color="@(selectedDays.Contains(DayOfWeek.Tuesday) ? Color.Primary : Color.Default)" 
+                                           OnClick="@(() => ToggleDay(DayOfWeek.Tuesday))">Tuesday</MudChip>
+                                    <MudChip T="string" Color="@(selectedDays.Contains(DayOfWeek.Wednesday) ? Color.Primary : Color.Default)" 
+                                           OnClick="@(() => ToggleDay(DayOfWeek.Wednesday))">Wednesday</MudChip>
+                                    <MudChip T="string" Color="@(selectedDays.Contains(DayOfWeek.Thursday) ? Color.Primary : Color.Default)" 
+                                           OnClick="@(() => ToggleDay(DayOfWeek.Thursday))">Thursday</MudChip>
+                                    <MudChip T="string" Color="@(selectedDays.Contains(DayOfWeek.Friday) ? Color.Primary : Color.Default)" 
+                                           OnClick="@(() => ToggleDay(DayOfWeek.Friday))">Friday</MudChip>
+                                    <MudChip T="string" Color="@(selectedDays.Contains(DayOfWeek.Saturday) ? Color.Primary : Color.Default)" 
+                                           OnClick="@(() => ToggleDay(DayOfWeek.Saturday))">Saturday</MudChip>
+                                    <MudChip T="string" Color="@(selectedDays.Contains(DayOfWeek.Sunday) ? Color.Primary : Color.Default)" 
+                                           OnClick="@(() => ToggleDay(DayOfWeek.Sunday))">Sunday</MudChip>
+                                </div>
+                            }
+
+                            <MudDatePicker Label="Recurrence End Date" 
+                                         @bind-Date="goodWork.RecurrenceEndDate"
+                                         MinDate="@DateTime.Today"
+                                         Class="mt-3" 
+                                         HelperText="Leave empty to repeat indefinitely" />
+                        }
+
                         @if (success)
                         {
                             <MudText Color="Color.Success" Class="mt-3">Good work successfully added!</MudText>
@@ -147,6 +194,11 @@
     private TimeSpan? _startTime = new TimeSpan(9, 0, 0);
     private TimeSpan? _endTime = new TimeSpan(17, 0, 0);
 
+    // Recurring event fields
+    private string selectedRecurrenceType = "WEEKLY";
+    private int recurrenceInterval = 1;
+    private List<DayOfWeek> selectedDays = new();
+
     private readonly List<string> _predefinedCategories = new()
     {
         "Food Bank",
@@ -179,6 +231,57 @@
         };
 
         goodWork.CreatedDate = DateTime.UtcNow;
+    }
+
+    private string GetIntervalHelperText()
+    {
+        return selectedRecurrenceType switch
+        {
+            "DAILY" => $"Repeats every {recurrenceInterval} day{(recurrenceInterval > 1 ? "s" : "")}",
+            "WEEKLY" => $"Repeats every {recurrenceInterval} week{(recurrenceInterval > 1 ? "s" : "")}",
+            "MONTHLY" => $"Repeats every {recurrenceInterval} month{(recurrenceInterval > 1 ? "s" : "")}",
+            "YEARLY" => $"Repeats every {recurrenceInterval} year{(recurrenceInterval > 1 ? "s" : "")}",
+            _ => ""
+        };
+    }
+
+    private void ToggleDay(DayOfWeek day)
+    {
+        if (selectedDays.Contains(day))
+        {
+            selectedDays.Remove(day);
+        }
+        else
+        {
+            selectedDays.Add(day);
+        }
+    }
+
+    private void BuildRecurrencePattern()
+    {
+        if (!goodWork.IsRecurring)
+        {
+            goodWork.RecurrencePattern = null;
+            return;
+        }
+
+        var pattern = $"{selectedRecurrenceType}:{recurrenceInterval}";
+
+        if (selectedRecurrenceType == "WEEKLY" && selectedDays.Any())
+        {
+            var days = string.Join(",", selectedDays.Select(d => d.ToString().Substring(0, 3).ToUpper()));
+            pattern += $":{days}";
+        }
+        else if (selectedRecurrenceType == "MONTHLY" && goodWork.StartTime.HasValue)
+        {
+            pattern += $":{goodWork.StartTime.Value.Day}";
+        }
+        else if (selectedRecurrenceType == "YEARLY" && goodWork.StartTime.HasValue)
+        {
+            pattern += $":{goodWork.StartTime.Value.Month}:{goodWork.StartTime.Value.Day}";
+        }
+
+        goodWork.RecurrencePattern = pattern;
     }
 
     private async Task<IEnumerable<string>> SearchAddresses(string value, CancellationToken cancellationToken)
@@ -273,6 +376,9 @@
                 goodWork.EndTime = DateTime.Today.Add(_endTime.Value);
             }
 
+            // Build recurrence pattern before saving
+            BuildRecurrencePattern();
+
             await _neo4jService.CreateGoodWorkAsync(goodWork, userId);
             success = true;
             errorMessage = null;
@@ -280,6 +386,7 @@
             // Reset form after a short delay
             await Task.Delay(1500);
             goodWork = new GoodWorksModel { CreatedDate = DateTime.UtcNow };
+            selectedDays.Clear();
             success = false;
 
             if (_marker != null)
