@@ -1104,6 +1104,67 @@ public class Neo4jService : IDisposable
         return goodWorks;
     }
 
+    public async Task<List<GoodWorksModel>> GetNewOpportunitiesAsync(int daysBack = 30, int limit = 12)
+    {
+        var query = @"
+            MATCH (g:GoodWork)
+            WHERE g.createdDate >= datetime() - duration({days: $daysBack})
+              AND g.status = 'Active'
+              AND g.startTime >= datetime()
+            OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
+            OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
+            OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)
+            RETURN id(g) AS Id, g, c, cat, l
+            ORDER BY g.createdDate DESC
+            LIMIT $limit";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, new { daysBack, limit });
+
+        var goodWorks = new List<GoodWorksModel>();
+        await result.ForEachAsync(record =>
+        {
+            goodWorks.Add(MapRecordToGoodWork(record));
+        });
+
+        return goodWorks;
+    }
+
+    public async Task<List<DoGooderModel>> GetActiveDoGoodersAsync(int limit = 10)
+    {
+        var query = @"
+            MATCH (u:User)-[r:SIGNED_UP_FOR|CREATED]->(g:GoodWork)
+            WITH u, 
+                 count(DISTINCT g) AS eventCount,
+                 sum(CASE WHEN type(r) = 'SIGNED_UP_FOR' THEN 3 ELSE 5 END) AS estimatedCarrots
+            WHERE eventCount > 0
+            OPTIONAL MATCH (u:User)
+            WITH u.userId AS userId,
+                 coalesce(u.name, u.email, 'Anonymous User') AS name,
+                 eventCount,
+                 estimatedCarrots
+            RETURN userId, name, eventCount, estimatedCarrots AS carrotsEarned
+            ORDER BY eventCount DESC, carrotsEarned DESC
+            LIMIT $limit";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, new { limit });
+
+        var doGooders = new List<DoGooderModel>();
+        await result.ForEachAsync(record =>
+        {
+            doGooders.Add(new DoGooderModel
+            {
+                UserId = record["userId"].As<string?>(),
+                Name = record["name"].As<string>(),
+                EventCount = record["eventCount"].As<int>(),
+                CarrotsEarned = record["carrotsEarned"].As<int>()
+            });
+        });
+
+        return doGooders;
+    }
+
     public void Dispose()
     {
         _driver?.Dispose();

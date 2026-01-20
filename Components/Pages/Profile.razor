@@ -10,12 +10,36 @@
 <PageTitle>My Profile - Charity Rabbit</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+
     <MudText Typo="Typo.h3" GutterBottom="true">My Profile</MudText>
     
     @if (!string.IsNullOrEmpty(userName))
     {
         <MudText Typo="Typo.h6" Class="mb-4">Welcome, @userName!</MudText>
     }
+
+    <!-- Carrots Stats Card -->
+    <MudPaper Elevation="3" Class="pa-4 mb-4" Style="background: linear-gradient(135deg, #FFA726 0%, #FF9800 100%); color: white;">
+        <MudGrid>
+            <MudItem xs="12" sm="4" Class="text-center">
+                <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Large" Style="font-size: 64px;" Class="mb-2" />
+                <MudText Typo="Typo.h3">@totalCarrots</MudText>
+                <MudText Typo="Typo.h6">Total Carrots Earned</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="4" Class="text-center">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Class="mb-2" />
+                <MudText Typo="Typo.h4">@(signedUpGoodWorks?.Count ?? 0)</MudText>
+                <MudText Typo="Typo.body1">Events Signed Up</MudText>
+                <MudText Typo="Typo.caption">? @((signedUpGoodWorks?.Count ?? 0) * 3) carrots</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="4" Class="text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Create" Size="Size.Large" Class="mb-2" />
+                <MudText Typo="Typo.h4">@(createdGoodWorks?.Count ?? 0)</MudText>
+                <MudText Typo="Typo.body1">Events Created</MudText>
+                <MudText Typo="Typo.caption">? @((createdGoodWorks?.Count ?? 0) * 5) carrots</MudText>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
 
     <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6">
         <!-- My Created Good Works Tab -->
@@ -186,6 +210,7 @@
     private List<GoodWorksModel>? interestedGoodWorks;
     private string? userId;
     private string? userName;
+    private int totalCarrots => ((signedUpGoodWorks?.Count ?? 0) * 3) + ((createdGoodWorks?.Count ?? 0) * 5);
 
     protected override async Task OnInitializedAsync()
     {

@@ -7,9 +7,19 @@
 
 <PageTitle>Charity Rabbit - Make a Difference</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4 mt-4">
     <!-- Welcome Hero Section -->
     <MudPaper Elevation="4" Class="pa-6 mb-4 text-center" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <MudText Typo="Typo.h3" Class="mb-2">
+            @if (isAuthenticated && !string.IsNullOrEmpty(userName))
+            {
+                <text>Welcome back, @userName!</text>
+            }
+            else
+            {
+                <text>Welcome to Charity Rabbit</text>
+            }
+        </MudText>
         <MudText Typo="Typo.h6" Class="mb-4">
             Connect with opportunities to serve your community
         </MudText>
@@ -26,82 +36,61 @@
         }
     </MudPaper>
 
-    <!-- Bible Verse Carousel -->
-    <MudPaper Elevation="2" Class="pa-4 mb-4">
-        <MudCarousel Class="mud-width-full" Style="height:140px;" ShowArrows="true" ShowBullets="false" 
-                   EnableSwipeGesture="true" AutoCycle="true" TData="object">
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Ephesians 2:10 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "For we are God's handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Galatians 6:9 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Matthew 5:16 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Hebrews 10:24 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "And let us consider how we may spur one another on toward love and good deeds."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-            <MudCarouselItem>
-                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
-                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">James 2:17 (NIV)</MudText>
-                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
-                        "In the same way, faith by itself, if it is not accompanied by action, is dead."
-                    </MudText>
-                </div>
-            </MudCarouselItem>
-        </MudCarousel>
-    </MudPaper>
-
     @if (isAuthenticated)
     {
-        <!-- Personalized Content for Logged In Users -->
-        
-        <!-- My Upcoming Events -->
-        @if (upcomingEvents != null && upcomingEvents.Any())
+        <!-- User Stats Dashboard -->
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Color="Color.Success">@signedUpCount</MudText>
+                    <MudText Typo="Typo.body2">Signed Up</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Info" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Color="Color.Info">@interestedCount</MudText>
+                    <MudText Typo="Typo.body2">Interested</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <div style="font-size: 48px;">🥕</div>
+                    <MudText Typo="Typo.h4" Color="Color.Warning">@totalCarrots</MudText>
+                    <MudText Typo="Typo.body2">Carrots Earned</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudPaper Elevation="2" Class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Create" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Color="Color.Primary">@createdCount</MudText>
+                    <MudText Typo="Typo.body2">Created Events</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <!-- My Current Commitments -->
+        @if (signedUpWorks != null && signedUpWorks.Any())
         {
             <MudPaper Elevation="2" Class="pa-4 mb-4">
-                <MudText Typo="Typo.h5" GutterBottom="true">
-                    <MudIcon Icon="@Icons.Material.Filled.Event" Class="mr-2" />
-                    Your Upcoming Events
-                </MudText>
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.h5">
+                        <MudIcon Icon="@Icons.Material.Filled.EventAvailable" Class="mr-2" />
+                        My Current Commitments
+                    </MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/profile">View All</MudButton>
+                </div>
                 
                 <MudGrid>
-                    @foreach (var work in upcomingEvents.Take(6))
+                    @foreach (var work in signedUpWorks.Take(3))
                     {
-                        <MudItem xs="12" sm="6" md="4">
+                        <MudItem xs="12" md="4">
                             <MudCard>
                                 <MudCardContent>
                                     <MudText Typo="Typo.h6">@work.Name</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Signed Up</MudChip>
                                     <MudChip T="string" Size="Size.Small" Color="Color.Primary">@work.Category</MudChip>
-                                    @if (work.IsUserSignedUp)
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.CheckCircle">Signed Up</MudChip>
-                                    }
-                                    else if (work.IsUserInterested)
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Star">Interested</MudChip>
-                                    }
                                     
                                     @if (work.StartTime.HasValue)
                                     {
@@ -129,13 +118,53 @@
                         </MudItem>
                     }
                 </MudGrid>
+            </MudPaper>
+        }
 
-                @if (upcomingEvents.Count > 6)
-                {
-                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/profile" Class="mt-3">
-                        View All @upcomingEvents.Count Events →
-                    </MudButton>
-                }
+        <!-- Interested In -->
+        @if (interestedWorks != null && interestedWorks.Any())
+        {
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.h5">
+                        <MudIcon Icon="@Icons.Material.Filled.StarBorder" Class="mr-2" />
+                        I'm Interested In
+                    </MudText>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/profile">View All</MudButton>
+                </div>
+                
+                <MudGrid>
+                    @foreach (var work in interestedWorks.Take(3))
+                    {
+                        <MudItem xs="12" md="4">
+                            <MudCard>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.h6">@work.Name</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Star">Interested</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@work.Category</MudChip>
+                                    
+                                    @if (work.StartTime.HasValue)
+                                    {
+                                        <MudText Typo="Typo.body2" Class="mt-2">
+                                            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" />
+                                            @work.StartTime.Value.ToString("MMM dd, yyyy")
+                                        </MudText>
+                                    }
+                                    
+                                    <MudText Typo="Typo.body2" Class="mt-2">
+                                        @(work.Description?.Length > 80 ? work.Description.Substring(0, 80) + "..." : work.Description)
+                                    </MudText>
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" 
+                                             Href="@($"/goodwork/{work.Id}")">
+                                        Learn More
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
             </MudPaper>
         }
 
@@ -161,7 +190,7 @@
                                     <MudChip T="string" Size="Size.Small" Color="Color.Primary">@work.Category</MudChip>
                                     
                                     <MudText Typo="Typo.body2" Class="mt-2">
-                                        @(work.Description.Length > 100 ? work.Description.Substring(0, 100) + "..." : work.Description)
+                                        @(work.Description?.Length > 100 ? work.Description.Substring(0, 100) + "..." : work.Description)
                                     </MudText>
                                     
                                     @if (work.StartTime.HasValue)
@@ -179,6 +208,88 @@
                                     </MudButton>
                                 </MudCardActions>
                             </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        }
+
+        <!-- New Opportunities -->
+        @if (newOpportunities != null && newOpportunities.Any())
+        {
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">
+                    <MudIcon Icon="@Icons.Material.Filled.FiberNew" Class="mr-2" />
+                    New Opportunities
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+                    Recently added volunteer opportunities in your area
+                </MudText>
+                
+                <MudGrid>
+                    @foreach (var work in newOpportunities.Take(6))
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudCard>
+                                <MudCardContent>
+                                    <div class="d-flex justify-space-between align-center">
+                                        <MudText Typo="Typo.h6">@work.Name</MudText>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">NEW</MudChip>
+                                    </div>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@work.Category</MudChip>
+                                    
+                                    <MudText Typo="Typo.body2" Class="mt-2">
+                                        @(work.Description?.Length > 100 ? work.Description.Substring(0, 100) + "..." : work.Description)
+                                    </MudText>
+                                    
+                                    @if (work.StartTime.HasValue)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="mt-2">
+                                            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" />
+                                            @work.StartTime.Value.ToString("MMM dd, yyyy")
+                                        </MudText>
+                                    }
+                                </MudCardContent>
+                                <MudCardActions>
+                                    <MudButton Variant="Variant.Text" Color="Color.Primary" 
+                                             Href="@($"/goodwork/{work.Id}")">
+                                        Explore
+                                    </MudButton>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudPaper>
+        }
+
+        <!-- Active Do-Gooders -->
+        @if (activeDoGooders != null && activeDoGooders.Any())
+        {
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">
+                    <MudIcon Icon="@Icons.Material.Filled.People" Class="mr-2" />
+                    Active Do-Gooders
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-3" Color="Color.Secondary">
+                    Community members making a difference
+                </MudText>
+                
+                <MudGrid>
+                    @foreach (var doGooder in activeDoGooders.Take(4))
+                    {
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudPaper Elevation="1" Class="pa-3 text-center">
+                                <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mb-2">
+                                    @GetInitials(doGooder.Name)
+                                </MudAvatar>
+                                <MudText Typo="Typo.h6">@doGooder.Name</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@doGooder.EventCount events</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Warning">🥕 @doGooder.CarrotsEarned carrots</MudText>
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small" Class="mt-2">
+                                    View Profile
+                                </MudButton>
+                            </MudPaper>
                         </MudItem>
                     }
                 </MudGrid>
@@ -227,6 +338,53 @@
         </MudPaper>
     }
 
+    <!-- Bible Verse Carousel -->
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudCarousel Class="mud-width-full" Style="height:140px;" ShowArrows="true" ShowBullets="false" 
+                   EnableSwipeGesture="true" AutoCycle="true" TData="object">
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Ephesians 2:10 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "For we are God's handiwork, created in Christ Jesus to do good works, which God prepared in advance for us to do."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Galatians 6:9 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Matthew 5:16 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "Let your light shine before others, that they may see your good deeds and glorify your Father in heaven."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">Hebrews 10:24 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "And let us consider how we may spur one another on toward love and good deeds."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+            <MudCarouselItem>
+                <div class="d-flex justify-center align-center flex-column" style="height: 100%;">
+                    <MudText Typo="Typo.subtitle2" Color="Color.Primary">James 2:17 (NIV)</MudText>
+                    <MudText Typo="Typo.body1" Align="Align.Center" Class="px-4">
+                        "In the same way, faith by itself, if it is not accompanied by action, is dead."
+                    </MudText>
+                </div>
+            </MudCarouselItem>
+        </MudCarousel>
+    </MudPaper>
+
     <!-- Quick Actions -->
     <MudPaper Elevation="2" Class="pa-4">
         <MudText Typo="Typo.h5" GutterBottom="true">Explore Opportunities</MudText>
@@ -259,8 +417,20 @@
 @code {
     private bool isAuthenticated = false;
     private string? userId;
-    private List<GoodWorksModel>? upcomingEvents;
+    private string? userName;
+    
+    // User stats
+    private int signedUpCount = 0;
+    private int interestedCount = 0;
+    private int totalCarrots = 0;  // Renamed from totalImpactHours - gamified!
+    private int createdCount = 0;
+    
+    // Content lists
+    private List<GoodWorksModel>? signedUpWorks;
+    private List<GoodWorksModel>? interestedWorks;
     private List<GoodWorksModel>? recommendedWorks;
+    private List<GoodWorksModel>? newOpportunities;
+    private List<DoGooderModel>? activeDoGooders;
 
     protected override async Task OnInitializedAsync()
     {
@@ -270,6 +440,8 @@
         if (isAuthenticated)
         {
             userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            userName = authState.User.FindFirst(ClaimTypes.Name)?.Value ?? 
+                      authState.User.FindFirst(ClaimTypes.Email)?.Value?.Split('@')[0];
             
             if (!string.IsNullOrEmpty(userId))
             {
@@ -284,13 +456,46 @@
 
         try
         {
-            upcomingEvents = await _neo4jService.GetUpcomingUserEventsAsync(userId);
+            // Load user's signed up events
+            signedUpWorks = await _neo4jService.GetUserSignedUpGoodWorksAsync(userId);
+            signedUpCount = signedUpWorks?.Count ?? 0;
+            
+            // Load user's interested events
+            interestedWorks = await _neo4jService.GetUserInterestedGoodWorksAsync(userId);
+            interestedCount = interestedWorks?.Count ?? 0;
+            
+            // Load user's created events
+            var createdWorks = await _neo4jService.GetUserCreatedGoodWorksAsync(userId);
+            createdCount = createdWorks?.Count ?? 0;
+            
+            // Calculate total carrots earned (estimated: 3 carrots per signup, 5 per created event)
+            totalCarrots = (signedUpCount * 3) + (createdCount * 5);
+            
+            // Load recommendations
             recommendedWorks = await _neo4jService.GetRecommendedGoodWorksAsync(userId, 12);
+            
+            // Load new opportunities (last 30 days)
+            newOpportunities = await _neo4jService.GetNewOpportunitiesAsync(30, 12);
+            
+            // Load active do-gooders
+            activeDoGooders = await _neo4jService.GetActiveDoGoodersAsync(10);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading personalized content: {ex.Message}");
         }
+    }
+    
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return "?";
+        
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        }
+        return parts[0][0].ToString().ToUpper();
     }
 }
 
