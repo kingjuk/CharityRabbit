@@ -26,9 +26,21 @@ Enhanced Twitter sharing:
 - `twitter:card` - summary_large_image
 - `twitter:title` - Tweet title
 - `twitter:description` - Tweet description
-- `twitter:image` - Preview image
+- `twitter:image` - Preview image (1200 x 630 px)
+- `twitter:image:alt` - Image description
 
-### 4. **JSON-LD Structured Data**
+### 4. **Image Optimization**
+Social media sharing images:
+- **Size:** 1200 x 630 pixels (Open Graph standard)
+- **Format:** PNG or high-quality JPG
+- **File Size:** < 300 KB recommended
+- **Location:** `/images/charityrabbit.png`
+- Includes proper alt text and dimensions
+- All pages explicitly define `og:image` property
+
+See [SOCIAL_MEDIA_IMAGES.md](SOCIAL_MEDIA_IMAGES.md) for detailed image creation guidelines.
+
+### 5. **JSON-LD Structured Data**
 Google-friendly structured data:
 - **Organization Schema** - Homepage
   - Name, logo, URL, description
@@ -42,7 +54,7 @@ Google-friendly structured data:
   - Organizer information
   - Availability status
 
-### 5. **Sitemap.xml**
+### 6. **Sitemap.xml**
 Auto-generated XML sitemap at `/sitemap.xml`:
 - Homepage (priority: 1.0)
 - Search page (priority: 0.9)
@@ -51,7 +63,7 @@ Auto-generated XML sitemap at `/sitemap.xml`:
 - Last modified dates
 - Change frequencies
 
-### 6. **robots.txt**
+### 7. **robots.txt**
 Search engine crawler directives:
 - Allow all pages except admin/auth
 - Sitemap location

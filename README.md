@@ -387,8 +387,35 @@ For questions, issues, or suggestions:
 
 **Made with ❤️ for the community** 🥕
 
-publish 
-aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 555467380508.dkr.ecr.us-east-2.amazonaws.com
-docker build -t charityrabbit .
-docker tag charityrabbit 555467380508.dkr.ecr.us-east-2.amazonaws.com/charityrabbit:638759256124735501
-docker push 555467380508.dkr.ecr.us-east-2.amazonaws.com/charityrabbit:638759256124735501
+## 📈 Monitoring & Analytics
+
+### Recommended Tools to Add:
+1. **Google Search Console**
+   - Submit sitemap
+   - Monitor indexing status
+   - Track search performance
+
+2. **Google Analytics 4**
+   - Track page views
+   - Monitor user behavior
+   - Conversion tracking
+
+3. **Bing Webmaster Tools**
+   - Submit sitemap
+   - Monitor Bing rankings
+
+### Social Media Images
+CharityRabbit uses optimized images for social media sharing:
+- **Open Graph Image:** `/images/charityrabbit.png` (1200 x 630 px)
+- **Twitter Card:** `/images/charityrabbit.png`
+- All pages include proper `og:image` and `twitter:image` tags
+
+See [docs/SOCIAL_MEDIA_IMAGES.md](docs/SOCIAL_MEDIA_IMAGES.md) for image optimization guidelines.
+
+### Key Metrics to Track:
+- Organic search traffic
+- Click-through rate (CTR)
+- Average position in search results
+- Indexed pages count
+- Core Web Vitals scores
+- Social media sharing engagement
