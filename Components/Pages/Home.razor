@@ -1,11 +1,38 @@
 ﻿@page "/"
 @using CharityRabbit.Models
+@using CharityRabbit.Data
 @using System.Security.Claims
 @inject Neo4jService _neo4jService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Navigation
+@inject SeoService _seoService
 
-<PageTitle>Charity Rabbit - Make a Difference</PageTitle>
+<PageTitle>CharityRabbit - Find & Create Volunteer Opportunities Near You</PageTitle>
+
+<HeadContent>
+    <meta name="description" content="Discover local volunteer opportunities, create community service events, and track your impact. Join CharityRabbit to make a difference in your community." />
+    <meta name="keywords" content="volunteer, volunteering, charity, community service, nonprofit, good works, volunteer opportunities, volunteer near me" />
+    <link rel="canonical" href="https://charityrabbit.com/" />
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="CharityRabbit - Find & Create Volunteer Opportunities" />
+    <meta property="og:description" content="Discover local volunteer opportunities and make a difference in your community" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://charityrabbit.com/" />
+    <meta property="og:site_name" content="CharityRabbit" />
+    <meta property="og:image" content="https://charityrabbit.com/images/og-image.png" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CharityRabbit - Find Volunteer Opportunities" />
+    <meta name="twitter:description" content="Discover local volunteer opportunities and make a difference" />
+    <meta name="twitter:image" content="https://charityrabbit.com/images/og-image.png" />
+    
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    @((MarkupString)_seoService.GetOrganizationSchema())
+    </script>
+</HeadContent>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4 mt-4">
 

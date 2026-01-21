@@ -6,8 +6,9 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject RecurringEventService _recurringEventService
+@inject SeoService _seoService
 
-<PageTitle>@(goodWork?.Name ?? "Good Work Details") - Charity Rabbit</PageTitle>
+<PageTitle>@_seoService.GetPageTitle(goodWork?.Name)</PageTitle>
 
 @if (goodWork == null)
 {
@@ -18,6 +19,28 @@
 }
 else
 {
+    <HeadContent>
+        <meta name="description" content="@goodWork.Description" />
+        <meta name="keywords" content="@string.Join(", ", new[] { goodWork.Category, "volunteer", "community service" }.Concat(goodWork.Tags ?? new List<string>()))" />
+        <link rel="canonical" href="@_seoService.GetCanonicalUrl($"/goodwork/{Id}")" />
+        
+        <!-- Open Graph -->
+        <meta property="og:title" content="@goodWork.Name - CharityRabbit" />
+        <meta property="og:description" content="@goodWork.Description" />
+        <meta property="og:type" content="event" />
+        <meta property="og:url" content="@_seoService.GetCanonicalUrl($"/goodwork/{Id}")" />
+        
+        <!-- Twitter Card -->
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="@goodWork.Name" />
+        <meta name="twitter:description" content="@goodWork.Description" />
+        
+        <!-- JSON-LD Event Schema -->
+        <script type="application/ld+json">
+        @((MarkupString)_seoService.GetEventSchema(goodWork))
+        </script>
+    </HeadContent>
+
     <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
         <!-- Header Section -->
         <MudPaper Elevation="4" Class="pa-6 mb-4">

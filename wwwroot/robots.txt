@@ -1,0 +1,12 @@
+# CharityRabbit robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /authentication/
+Disallow: /account/
+
+# Sitemap
+Sitemap: https://charityrabbit.com/sitemap.xml
+
+# Crawl delay
+Crawl-delay: 1

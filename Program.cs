@@ -8,6 +8,7 @@ using GoogleMapsComponents;
 using MLS.Api.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using CharityRabbit.Models;
 
 internal class Program
 {
@@ -32,6 +33,7 @@ internal class Program
         builder.Services.AddSingleton<GooglePlacesService>();
         builder.Services.AddScoped<TestDataService>();
         builder.Services.AddScoped<RecurringEventService>();
+        builder.Services.AddScoped<SeoService>();
 
         var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"] ?? throw new InvalidOperationException("GoogleMaps API key is missing in configuration.");
 
@@ -115,6 +117,13 @@ internal class Program
 
         app.MapGroup("/authentication").MapLoginAndLogout();
 
+        // SEO: Sitemap endpoint
+        app.MapGet("/sitemap.xml", async (Neo4jService neo4jService, SeoService seoService) =>
+        {
+            var goodWorks = await neo4jService.SearchGoodWorksAsync(new GoodWorksSearchCriteria(), null);
+            var sitemap = await seoService.GenerateSitemapXml(goodWorks);
+            return Results.Content(sitemap, "application/xml");
+        });
 
         await app.RunAsync();
     }

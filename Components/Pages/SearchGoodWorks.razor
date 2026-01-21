@@ -1,11 +1,24 @@
 @page "/search"
 @using CharityRabbit.Models
+@using CharityRabbit.Data
 @using GoogleMapsComponents
 @using GoogleMapsComponents.Maps
 @using MouseEvent = GoogleMapsComponents.Maps.MouseEvent
 @inject Neo4jService _neo4jService
+@inject SeoService _seoService
 
-<PageTitle>Search Good Works - Charity Rabbit</PageTitle>
+<PageTitle>Search Volunteer Opportunities - CharityRabbit</PageTitle>
+
+<HeadContent>
+    <meta name="description" content="Search and filter volunteer opportunities by category, location, and availability. Find the perfect way to give back to your community." />
+    <meta name="keywords" content="search volunteers, find volunteering, volunteer search, charity search, community service opportunities" />
+    <link rel="canonical" href="@_seoService.GetCanonicalUrl("/search")" />
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Search Volunteer Opportunities - CharityRabbit" />
+    <meta property="og:description" content="Find volunteer opportunities near you" />
+    <meta property="og:url" content="@_seoService.GetCanonicalUrl("/search")" />
+</HeadContent>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4 mt-4">
     <MudPaper Elevation="4" Class="pa-4">

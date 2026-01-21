@@ -7,9 +7,15 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject RecurringEventService _recurringEventService
+@inject SeoService _seoService
 @attribute [Authorize]
 
-<PageTitle>My Profile - Charity Rabbit</PageTitle>
+<PageTitle>My Profile - CharityRabbit</PageTitle>
+
+<HeadContent>
+    <meta name="description" content="View your volunteer profile, track your impact, and manage your commitments on CharityRabbit." />
+    <meta name="robots" content="noindex, nofollow" />
+</HeadContent>
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
 
