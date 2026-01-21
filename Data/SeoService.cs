@@ -37,7 +37,7 @@ public class SeoService
             type = "Organization",
             name = "CharityRabbit",
             url = _baseUrl,
-            logo = $"{_baseUrl}/images/charityrabbit.png",
+            logo = $"{_baseUrl}/images/charityrabbit.jpg",
             description = "Platform for finding and creating volunteer opportunities",
             sameAs = new[]
             {
@@ -87,7 +87,7 @@ public class SeoService
             type = "Event",
             name = goodWork.Name,
             description = goodWork.Description,
-            image = $"{_baseUrl}/images/charityrabbit.png",
+            image = $"{_baseUrl}/images/charityrabbit.jpg",
             startDate = goodWork.StartTime?.ToString("yyyy-MM-ddTHH:mm:ss"),
             endDate = goodWork.EndTime?.ToString("yyyy-MM-ddTHH:mm:ss"),
             eventStatus = goodWork.Status == "Active" ? "https://schema.org/EventScheduled" : "https://schema.org/EventCancelled",
@@ -171,10 +171,11 @@ public class SeoService
             { "og:type", "website" },
             { "og:url", GetCanonicalUrl(path) },
             { "og:site_name", "CharityRabbit" },
-            { "og:image", imageUrl ?? $"{_baseUrl}/images/charityrabbit.png" },
+            { "og:image", imageUrl ?? $"{_baseUrl}/images/charityrabbit.jpg" },
             { "og:image:alt", "CharityRabbit - Volunteer Opportunities Platform" },
             { "og:image:width", "1200" },
-            { "og:image:height", "630" }
+            { "og:image:height", "630" },
+            { "og:image:type", "image/jpeg" }
         };
     }
 
@@ -188,7 +189,7 @@ public class SeoService
             { "twitter:card", "summary_large_image" },
             { "twitter:title", title },
             { "twitter:description", description },
-            { "twitter:image", imageUrl ?? $"{_baseUrl}/images/charityrabbit.png" },
+            { "twitter:image", imageUrl ?? $"{_baseUrl}/images/charityrabbit.jpg" },
             { "twitter:image:alt", "CharityRabbit Logo" }
         };
     }
