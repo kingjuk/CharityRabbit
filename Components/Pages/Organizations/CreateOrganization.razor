@@ -1,0 +1,292 @@
+@page "/organizations/create"
+@using CharityRabbit.Models
+@using CharityRabbit.Data
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@inject OrganizationService _organizationService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+@attribute [Authorize]
+
+<PageTitle>Create Organization - CharityRabbit</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+    <MudText Typo="Typo.h3" GutterBottom="true">Create Your Organization</MudText>
+    <MudText Typo="Typo.body1" Class="mb-4">
+        Set up your organization profile to start posting volunteer opportunities and building your community.
+    </MudText>
+
+    <MudPaper Elevation="2" Class="pa-4">
+        <MudForm @ref="form" @bind-IsValid="@isValid">
+            <MudGrid>
+                <!-- Basic Information -->
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-2">Basic Information</MudText>
+                    <MudDivider Class="mb-4" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="organization.Name"
+                                Label="Organization Name"
+                                Required="true"
+                                RequiredError="Organization name is required"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudSelect @bind-Value="organization.OrganizationType"
+                             Label="Organization Type"
+                             Variant="Variant.Outlined">
+                        <MudSelectItem Value="@("Nonprofit")">Nonprofit</MudSelectItem>
+                        <MudSelectItem Value="@("Religious")">Religious Organization</MudSelectItem>
+                        <MudSelectItem Value="@("Educational")">Educational Institution</MudSelectItem>
+                        <MudSelectItem Value="@("Government")">Government Agency</MudSelectItem>
+                        <MudSelectItem Value="@("Community")">Community Group</MudSelectItem>
+                        <MudSelectItem Value="@("Other")">Other</MudSelectItem>
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="organization.Description"
+                                Label="Short Description"
+                                Lines="2"
+                                Required="true"
+                                RequiredError="Description is required"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="organization.Mission"
+                                Label="Mission Statement"
+                                Lines="3"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="organization.Vision"
+                                Label="Vision Statement"
+                                Lines="3"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <!-- Contact Information -->
+                <MudItem xs="12" Class="mt-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Contact Information</MudText>
+                    <MudDivider Class="mb-4" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="organization.ContactEmail"
+                                Label="Contact Email"
+                                InputType="InputType.Email"
+                                Required="true"
+                                RequiredError="Email is required"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="6">
+                    <MudTextField @bind-Value="organization.ContactPhone"
+                                Label="Contact Phone"
+                                InputType="InputType.Telephone"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="organization.Website"
+                                Label="Website"
+                                InputType="InputType.Url"
+                                Placeholder="https://example.org"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <!-- Location -->
+                <MudItem xs="12" Class="mt-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Location</MudText>
+                    <MudDivider Class="mb-4" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="organization.Address"
+                                Label="Street Address"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="organization.City"
+                                Label="City"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="organization.State"
+                                Label="State/Province"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="organization.ZipCode"
+                                Label="Zip/Postal Code"
+                                Variant="Variant.Outlined" />
+                </MudItem>
+
+                <!-- Focus Areas -->
+                <MudItem xs="12" Class="mt-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Focus Areas</MudText>
+                    <MudDivider Class="mb-4" />
+                </MudItem>
+
+                <MudItem xs="12">
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var area in availableFocusAreas)
+                        {
+                            var isSelected = selectedFocusAreas.Contains(area);
+                            <MudChip T="string" 
+                                   Color="@(isSelected ? Color.Primary : Color.Default)" 
+                                   OnClick="@(() => ToggleFocusArea(area))">
+                                @area
+                            </MudChip>
+                        }
+                    </div>
+                </MudItem>
+
+                <!-- Social Media (Optional) -->
+                <MudItem xs="12" Class="mt-4">
+                    <MudExpansionPanels>
+                        <MudExpansionPanel Text="Social Media (Optional)">
+                            <MudGrid>
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="organization.FacebookUrl"
+                                                Label="Facebook URL"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Custom.Brands.Facebook" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="organization.TwitterUrl"
+                                                Label="Twitter/X URL"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Custom.Brands.Twitter" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="organization.InstagramUrl"
+                                                Label="Instagram URL"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Custom.Brands.Instagram" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="organization.LinkedInUrl"
+                                                Label="LinkedIn URL"
+                                                Variant="Variant.Outlined"
+                                                Adornment="Adornment.Start"
+                                                AdornmentIcon="@Icons.Custom.Brands.LinkedIn" />
+                                </MudItem>
+                            </MudGrid>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                </MudItem>
+
+                <!-- Actions -->
+                <MudItem xs="12" Class="mt-4 d-flex gap-2">
+                    <MudButton Variant="Variant.Filled"
+                             Color="Color.Primary"
+                             Disabled="@(!isValid || isSaving)"
+                             OnClick="CreateOrganizationAsync"
+                             StartIcon="@Icons.Material.Filled.Add">
+                        @if (isSaving)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <span class="ml-2">Creating...</span>
+                        }
+                        else
+                        {
+                            <text>Create Organization</text>
+                        }
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                             Color="Color.Secondary"
+                             Href="/organizations"
+                             Disabled="@isSaving">
+                        Cancel
+                    </MudButton>
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudForm form = null!;
+    private bool isValid;
+    private bool isSaving;
+    private string? userId;
+    
+    private OrganizationModel organization = new();
+    private HashSet<string> selectedFocusAreas = new();
+
+    private readonly string[] availableFocusAreas = new[]
+    {
+        "Food & Hunger",
+        "Education & Literacy",
+        "Healthcare",
+        "Housing & Homelessness",
+        "Environment",
+        "Animal Welfare",
+        "Youth & Children",
+        "Seniors",
+        "Arts & Culture",
+        "Community Development",
+        "Disaster Relief",
+        "International Aid"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    }
+
+    private async Task CreateOrganizationAsync()
+    {
+        if (string.IsNullOrEmpty(userId))
+        {
+            Snackbar.Add("You must be logged in to create an organization", Severity.Error);
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            // Set selected focus areas
+            organization.FocusAreas = selectedFocusAreas.ToList();
+
+            var createdOrg = await _organizationService.CreateOrganizationAsync(organization, userId);
+
+            Snackbar.Add($"Organization '{createdOrg.Name}' created successfully!", Severity.Success);
+            Navigation.NavigateTo($"/organizations/{createdOrg.Slug}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating organization: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ToggleFocusArea(string area)
+    {
+        if (selectedFocusAreas.Contains(area))
+        {
+            selectedFocusAreas.Remove(area);
+        }
+        else
+        {
+            selectedFocusAreas.Add(area);
+        }
+    }
+}

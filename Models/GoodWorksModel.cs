@@ -72,6 +72,10 @@ namespace CharityRabbit.Models
         // Organization/charity details
         public string? OrganizationName { get; set; }
         public string? OrganizationWebsite { get; set; }
+        public long? OrganizationId { get; set; } // Link to organization
+        public string? OrganizationSlug { get; set; }
+        public bool IsOrganizationPost { get; set; } = false; // Posted by organization vs individual
+        public string CreatedBy { get; set; } = string.Empty; // User ID of creator
 
         // Additional logistics
         public bool ParkingAvailable { get; set; } = false;

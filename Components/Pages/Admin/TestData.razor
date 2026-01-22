@@ -29,13 +29,13 @@
                 </MudText>
                 
                 <MudText Typo="Typo.body1" Class="mb-3">
-                    Import 100 sample Good Works from the JSON file. All imported data will be tagged as TEST_DATA for easy cleanup.
+                    Import 100 sample Good Works and 10 organizations from the JSON file. All imported data will be tagged as TEST_DATA for easy cleanup.
                 </MudText>
 
                 @if (previewData != null && previewData.Any())
                 {
                     <MudText Typo="Typo.body2" Color="Color.Info" Class="mb-3">
-                        ?? Ready to import <strong>@previewData.Count</strong> Good Works
+                        ? Ready to import <strong>@previewData.Count</strong> Good Works and <strong>10</strong> Organizations
                     </MudText>
                     
                     <MudText Typo="Typo.caption" Class="mb-2">Sample categories:</MudText>
@@ -49,6 +49,11 @@
                             <MudChip T="string" Size="Size.Small">+@(previewData.Select(g => g.Category).Distinct().Count() - 5) more</MudChip>
                         }
                     </div>
+                    
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                        <strong>80%</strong> of events will be posted by organizations<br />
+                        <strong>20%</strong> will be individual posts
+                    </MudAlert>
                 }
 
                 @if (testDataCount > 0)
@@ -158,19 +163,28 @@
                 </MudText>
                 
                 <MudText Typo="Typo.body2" Class="mb-2">
-                    • All imported Good Works are automatically tagged with <MudChip T="string" Size="Size.Small">TEST_DATA</MudChip>
+                    • All imported data is automatically tagged with <MudChip T="string" Size="Size.Small">TEST_DATA</MudChip>
                 </MudText>
                 <MudText Typo="Typo.body2" Class="mb-2">
-                    • Test data includes 100 diverse volunteer opportunities across all 10 categories
+                    • Creates <strong>10 organizations</strong> covering all major service categories
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Imports <strong>100 diverse volunteer opportunities</strong> across all 10 categories
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • <strong>80% of events</strong> are assigned to organizations, <strong>20%</strong> remain as individual posts
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Each organization gets multiple events based on their focus areas
                 </MudText>
                 <MudText Typo="Typo.body2" Class="mb-2">
                     • Data includes realistic details: dates, locations, contacts, effort levels, and more
                 </MudText>
                 <MudText Typo="Typo.body2" Class="mb-2">
-                    • Perfect for testing search, filtering, map views, and other features
+                    • Perfect for testing search, filtering, map views, organization profiles, and other features
                 </MudText>
                 <MudText Typo="Typo.body2">
-                    • Deletion only affects test data - your manually created Good Works are safe
+                    • Deletion only affects test data - your manually created data is safe
                 </MudText>
             </MudPaper>
         </MudItem>

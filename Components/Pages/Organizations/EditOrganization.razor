@@ -1,0 +1,235 @@
+@page "/organizations/{Slug}/edit"
+@using CharityRabbit.Models
+@using CharityRabbit.Data
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@inject OrganizationService _organizationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@attribute [Authorize]
+
+<PageTitle>Edit Organization - CharityRabbit</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (organization == null)
+    {
+        <MudAlert Severity="Severity.Warning">Organization not found or you don't have permission to edit it.</MudAlert>
+    }
+    else
+    {
+        <MudText Typo="Typo.h3" GutterBottom="true">Edit Organization</MudText>
+        
+        <EditForm Model="@organization" OnValidSubmit="SaveOrganization">
+            <DataAnnotationsValidator />
+            
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">Basic Information</MudText>
+                
+                <MudTextField Label="Organization Name" 
+                            @bind-Value="organization.Name" 
+                            For="@(() => organization.Name)"
+                            Required="true"
+                            Class="mb-3" />
+                
+                <MudTextField Label="Description" 
+                            @bind-Value="organization.Description"
+                            For="@(() => organization.Description)"
+                            Lines="3"
+                            Required="true"
+                            Class="mb-3" />
+                
+                <MudTextField Label="Mission Statement" 
+                            @bind-Value="organization.Mission"
+                            Lines="3"
+                            Class="mb-3" />
+                
+                <MudTextField Label="Vision Statement" 
+                            @bind-Value="organization.Vision"
+                            Lines="3"
+                            Class="mb-3" />
+                
+                <MudSelect Label="Organization Type" 
+                         @bind-Value="organization.OrganizationType"
+                         Class="mb-3">
+                    <MudSelectItem Value="@("Nonprofit")">Nonprofit</MudSelectItem>
+                    <MudSelectItem Value="@("Religious")">Religious</MudSelectItem>
+                    <MudSelectItem Value="@("Educational")">Educational</MudSelectItem>
+                    <MudSelectItem Value="@("Government")">Government</MudSelectItem>
+                    <MudSelectItem Value="@("Community")">Community</MudSelectItem>
+                </MudSelect>
+            </MudPaper>
+
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">Contact Information</MudText>
+                
+                <MudTextField Label="Contact Email" 
+                            @bind-Value="organization.ContactEmail"
+                            For="@(() => organization.ContactEmail)"
+                            Required="true"
+                            InputType="InputType.Email"
+                            Class="mb-3" />
+                
+                <MudTextField Label="Contact Phone" 
+                            @bind-Value="organization.ContactPhone"
+                            Class="mb-3" />
+                
+                <MudTextField Label="Website" 
+                            @bind-Value="organization.Website"
+                            Placeholder="https://example.org"
+                            Class="mb-3" />
+            </MudPaper>
+
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">Location</MudText>
+                
+                <MudTextField Label="Address" 
+                            @bind-Value="organization.Address"
+                            Class="mb-3" />
+                
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="City" 
+                                    @bind-Value="organization.City"
+                                    Class="mb-3" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudTextField Label="State" 
+                                    @bind-Value="organization.State"
+                                    Class="mb-3" />
+                    </MudItem>
+                    <MudItem xs="12" md="3">
+                        <MudTextField Label="Zip Code" 
+                                    @bind-Value="organization.ZipCode"
+                                    Class="mb-3" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h5" GutterBottom="true">Social Media</MudText>
+                
+                <MudTextField Label="Facebook URL" 
+                            @bind-Value="organization.FacebookUrl"
+                            Placeholder="https://facebook.com/yourorg"
+                            Class="mb-3" />
+                
+                <MudTextField Label="Twitter URL" 
+                            @bind-Value="organization.TwitterUrl"
+                            Placeholder="https://twitter.com/yourorg"
+                            Class="mb-3" />
+                
+                <MudTextField Label="Instagram URL" 
+                            @bind-Value="organization.InstagramUrl"
+                            Placeholder="https://instagram.com/yourorg"
+                            Class="mb-3" />
+                
+                <MudTextField Label="LinkedIn URL" 
+                            @bind-Value="organization.LinkedInUrl"
+                            Placeholder="https://linkedin.com/company/yourorg"
+                            Class="mb-3" />
+            </MudPaper>
+
+            <div class="d-flex gap-2">
+                <MudButton ButtonType="ButtonType.Submit" 
+                         Variant="Variant.Filled" 
+                         Color="Color.Primary"
+                         Disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <span>Save Changes</span>
+                    }
+                </MudButton>
+                
+                <MudButton Variant="Variant.Outlined" 
+                         Color="Color.Default"
+                         Href="@($"/organizations/{Slug}")">
+                    Cancel
+                </MudButton>
+            </div>
+        </EditForm>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+
+    private OrganizationModel? organization;
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        await LoadOrganization();
+    }
+
+    private async Task LoadOrganization()
+    {
+        isLoading = true;
+
+        try
+        {
+            organization = await _organizationService.GetOrganizationBySlugAsync(Slug, userId);
+            
+            // Check if user is admin
+            if (organization != null && !organization.IsUserAdmin)
+            {
+                organization = null; // Hide from non-admins
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading organization: {ex.Message}");
+            Snackbar.Add("Error loading organization", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveOrganization()
+    {
+        if (organization == null) return;
+
+        isSaving = true;
+
+        try
+        {
+            var success = await _organizationService.UpdateOrganizationAsync(organization);
+            
+            if (success)
+            {
+                Snackbar.Add("Organization updated successfully!", Severity.Success);
+                Navigation.NavigateTo($"/organizations/{organization.Slug}");
+            }
+            else
+            {
+                Snackbar.Add("Failed to update organization", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving organization: {ex.Message}");
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

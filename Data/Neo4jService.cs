@@ -19,6 +19,11 @@ public class Neo4jService : IDisposable
         _locationServices = locationServices;
     }
 
+    public IAsyncSession GetSession()
+    {
+        return _driver.AsyncSession();
+    }
+
     public async Task CreateGoodWorkAsync(GoodWorksModel goodWork, string? userId = null)
     {
         var (city, state, country, zip) = await _locationServices.GetLocationDetailsAsync(goodWork.Latitude, goodWork.Longitude);
@@ -131,6 +136,10 @@ public class Neo4jService : IDisposable
             country = country ?? string.Empty,
             zip = zip ?? string.Empty
         });
+
+        // Get the created ID and set it on the goodWork object
+        var record = await result.SingleAsync();
+        goodWork.Id = record["id"].As<long>();
     }
 
     public async Task<GoodWorksModel?> GetGoodWorkByIdAsync(long id, string? userId = null)

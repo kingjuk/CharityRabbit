@@ -1,0 +1,469 @@
+@page "/organizations/{Slug}"
+@using CharityRabbit.Models
+@using CharityRabbit.Data
+@using System.Security.Claims
+@using Neo4j.Driver
+@inject OrganizationService _organizationService
+@inject Neo4jService _neo4jService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDialogService DialogService
+
+<PageTitle>@(organization?.Name ?? "Organization") - CharityRabbit</PageTitle>
+
+@if (organization != null)
+{
+    <HeadContent>
+        <meta name="description" content="@organization.Description" />
+    </HeadContent>
+}
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pa-4 mt-4">
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (organization == null)
+    {
+        <MudAlert Severity="MudBlazor.Severity.Warning">Organization not found</MudAlert>
+    }
+    else
+    {
+        <!-- Cover Image -->
+        @if (!string.IsNullOrEmpty(organization.CoverImageUrl))
+        {
+            <MudPaper Elevation="0" Class="mb-4" Style="@($"background-image: url({organization.CoverImageUrl}); background-size: cover; height: 300px;")">
+            </MudPaper>
+        }
+
+        <!-- Organization Header -->
+        <MudPaper Elevation="2" Class="pa-4 mb-4">
+            <MudGrid>
+                <MudItem xs="12" md="2">
+                    @if (!string.IsNullOrEmpty(organization.LogoUrl))
+                    {
+                        <MudAvatar Size="Size.Large" Style="width: 120px; height: 120px;">
+                            <MudImage Src="@organization.LogoUrl" Alt="@organization.Name" />
+                        </MudAvatar>
+                    }
+                    else
+                    {
+                        <MudAvatar Color="Color.Primary" Size="Size.Large" Style="width: 120px; height: 120px;">
+                            <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Large" />
+                        </MudAvatar>
+                    }
+                </MudItem>
+                <MudItem xs="12" md="10">
+                    <div class="d-flex justify-space-between align-center">
+                        <div>
+                            <MudText Typo="Typo.h3">
+                                @organization.Name
+                                @if (organization.IsVerified)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Primary" Title="Verified Organization" />
+                                }
+                            </MudText>
+                            <MudText Typo="Typo.body1" Color="Color.Secondary">
+                                @organization.OrganizationType
+                                @if (!string.IsNullOrEmpty(organization.City))
+                                {
+                                    <text> • @organization.City, @organization.State</text>
+                                }
+                            </MudText>
+                        </div>
+                        @if (organization.IsUserAdmin)
+                        {
+                            <div>
+                                <MudButton Variant="Variant.Outlined"
+                                         Color="Color.Primary"
+                                         StartIcon="@Icons.Material.Filled.Edit"
+                                         Href="@($"/organizations/{organization.Slug}/edit")">
+                                    Edit
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined"
+                                         Color="Color.Secondary"
+                                         StartIcon="@Icons.Material.Filled.People"
+                                         Href="@($"/organizations/{organization.Slug}/members")">
+                                    Manage Members
+                                </MudButton>
+                            </div>
+                        }
+                        else if (!organization.IsUserMember)
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                     Color="Color.Primary"
+                                     StartIcon="@Icons.Material.Filled.GroupAdd"
+                                     OnClick="JoinOrganization">
+                                Join Organization
+                            </MudButton>
+                        }
+                    </div>
+
+                    <MudText Typo="Typo.body1" Class="mt-3">@organization.Description</MudText>
+
+                    <!-- Stats -->
+                    <MudChipSet T="string" Class="mt-3">
+                        <MudChip T="string" Icon="@Icons.Material.Filled.People" Color="Color.Info">
+                            @organization.MemberCount Members
+                        </MudChip>
+                        <MudChip T="string" Icon="@Icons.Material.Filled.Event" Color="Color.Success">
+                            @organization.EventCount Events
+                        </MudChip>
+                        <MudChip T="string" Icon="@Icons.Material.Filled.VolunteerActivism" Color="Color.Warning">
+                            @organization.VolunteerCount Volunteers
+                        </MudChip>
+                    </MudChipSet>
+
+                    <!-- Focus Areas -->
+                    @if (organization.FocusAreas?.Any() == true)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-3">Focus Areas:</MudText>
+                        <MudChipSet T="string">
+                            @foreach (var area in organization.FocusAreas)
+                            {
+                                <MudChip T="string" Color="Color.Primary" Size="Size.Small">@area</MudChip>
+                            }
+                        </MudChipSet>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <!-- Tabs -->
+        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+            <!-- About Tab -->
+            <MudTabPanel Text="About" Icon="@Icons.Material.Filled.Info">
+                <MudGrid>
+                    <MudItem xs="12" md="8">
+                        @if (!string.IsNullOrEmpty(organization.Mission))
+                        {
+                            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                                <MudText Typo="Typo.h6" GutterBottom="true">Mission</MudText>
+                                <MudText Typo="Typo.body1">@organization.Mission</MudText>
+                            </MudPaper>
+                        }
+
+                        @if (!string.IsNullOrEmpty(organization.Vision))
+                        {
+                            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                                <MudText Typo="Typo.h6" GutterBottom="true">Vision</MudText>
+                                <MudText Typo="Typo.body1">@organization.Vision</MudText>
+                            </MudPaper>
+                        }
+
+                        @if (organization.FoundedDate.HasValue)
+                        {
+                            <MudText Typo="Typo.body2" Class="mt-2">
+                                <strong>Founded:</strong> @organization.FoundedDate.Value.ToString("MMMM yyyy")
+                            </MudText>
+                        }
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudPaper Elevation="1" Class="pa-3">
+                            <MudText Typo="Typo.h6" GutterBottom="true">Contact Information</MudText>
+                            
+                            <MudText Typo="Typo.body2" Class="mb-2">
+                                <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" />
+                                <a href="mailto:@organization.ContactEmail">@organization.ContactEmail</a>
+                            </MudText>
+
+                            @if (!string.IsNullOrEmpty(organization.ContactPhone))
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Phone" Size="Size.Small" />
+                                    <a href="tel:@organization.ContactPhone">@organization.ContactPhone</a>
+                                </MudText>
+                            }
+
+                            @if (!string.IsNullOrEmpty(organization.Website))
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Language" Size="Size.Small" />
+                                    <a href="@organization.Website" target="_blank">Visit Website</a>
+                                </MudText>
+                            }
+
+                            @if (!string.IsNullOrEmpty(organization.Address))
+                            {
+                                <MudText Typo="Typo.body2" Class="mt-3">
+                                    <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" />
+                                    <strong>Address:</strong><br />
+                                    @organization.Address<br />
+                                    @organization.City, @organization.State @organization.ZipCode
+                                </MudText>
+                            }
+
+                            <!-- Social Media -->
+                            @if (!string.IsNullOrEmpty(organization.FacebookUrl) ||
+                                 !string.IsNullOrEmpty(organization.TwitterUrl) ||
+                                 !string.IsNullOrEmpty(organization.InstagramUrl) ||
+                                 !string.IsNullOrEmpty(organization.LinkedInUrl))
+                            {
+                                <MudDivider Class="my-3" />
+                                <MudText Typo="Typo.subtitle2" GutterBottom="true">Follow Us</MudText>
+                                <div class="d-flex gap-2">
+                                    @if (!string.IsNullOrEmpty(organization.FacebookUrl))
+                                    {
+                                        <MudIconButton Icon="@Icons.Custom.Brands.Facebook" Color="Color.Primary" Href="@organization.FacebookUrl" Target="_blank" />
+                                    }
+                                    @if (!string.IsNullOrEmpty(organization.TwitterUrl))
+                                    {
+                                        <MudIconButton Icon="@Icons.Custom.Brands.Twitter" Color="Color.Info" Href="@organization.TwitterUrl" Target="_blank" />
+                                    }
+                                    @if (!string.IsNullOrEmpty(organization.InstagramUrl))
+                                    {
+                                        <MudIconButton Icon="@Icons.Custom.Brands.Instagram" Color="Color.Error" Href="@organization.InstagramUrl" Target="_blank" />
+                                    }
+                                    @if (!string.IsNullOrEmpty(organization.LinkedInUrl))
+                                    {
+                                        <MudIconButton Icon="@Icons.Custom.Brands.LinkedIn" Color="Color.Primary" Href="@organization.LinkedInUrl" Target="_blank" />
+                                    }
+                                </div>
+                            }
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
+
+            <!-- Events Tab -->
+            <MudTabPanel Text="Events" Icon="@Icons.Material.Filled.Event">
+                @if (orgEvents == null)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                }
+                else if (!orgEvents.Any())
+                {
+                    <MudAlert Severity="MudBlazor.Severity.Info">No events yet. 
+                        @if (organization.IsUserAdmin)
+                        {
+                            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/add-good-work">Create First Event</MudButton>
+                        }
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudGrid>
+                        @foreach (var evt in orgEvents)
+                        {
+                            <MudItem xs="12" md="6" lg="4">
+                                <MudCard>
+                                    <MudCardContent>
+                                        <MudText Typo="Typo.h6">@evt.Name</MudText>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">@evt.Category</MudChip>
+                                        
+                                        @if (evt.StartTime.HasValue)
+                                        {
+                                            <MudText Typo="Typo.body2" Class="mt-2">
+                                                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" />
+                                                @evt.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                            </MudText>
+                                        }
+                                        
+                                        <MudText Typo="Typo.body2" Class="mt-2">
+                                            @(evt.Description?.Length > 100 ? evt.Description.Substring(0, 100) + "..." : evt.Description)
+                                        </MudText>
+                                    </MudCardContent>
+                                    <MudCardActions>
+                                        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="@($"/goodwork/{evt.Id}")">
+                                            Learn More
+                                        </MudButton>
+                                    </MudCardActions>
+                                </MudCard>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+            </MudTabPanel>
+
+            <!-- Members Tab -->
+            <MudTabPanel Text="Members" Icon="@Icons.Material.Filled.People">
+                @if (orgMembers == null)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                }
+                else if (!orgMembers.Any())
+                {
+                    <MudAlert Severity="MudBlazor.Severity.Info">No members yet.</MudAlert>
+                }
+                else
+                {
+                    <MudGrid>
+                        @foreach (var member in orgMembers)
+                        {
+                            <MudItem xs="12" sm="6" md="4">
+                                <MudPaper Elevation="1" Class="pa-3">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudAvatar Color="Color.Primary">
+                                            @GetInitials(member.Name)
+                                        </MudAvatar>
+                                        <div>
+                                            <MudText Typo="Typo.subtitle1">@member.Name</MudText>
+                                            <MudChip T="string" Value="@member.Role" Size="Size.Small" Color="@(member.Role == "Admin" ? Color.Error : Color.Info)">
+                                                @member.Role
+                                            </MudChip>
+                                        </div>
+                                    </div>
+                                    @if (member.ContributedEvents > 0)
+                                    {
+                                        <MudText Typo="Typo.caption" Class="mt-2">
+                                            Created @member.ContributedEvents event(s)
+                                        </MudText>
+                                    }
+                                </MudPaper>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+            </MudTabPanel>
+        </MudTabs>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+
+    private bool isLoading = true;
+    private OrganizationModel? organization;
+    private List<GoodWorksModel>? orgEvents;
+    private List<OrganizationMemberModel>? orgMembers;
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        await LoadOrganization();
+    }
+
+    private async Task LoadOrganization()
+    {
+        isLoading = true;
+
+        try
+        {
+            organization = await _organizationService.GetOrganizationBySlugAsync(Slug, userId);
+
+            if (organization != null)
+            {
+                // Load organization events using proper Neo4j query
+                orgEvents = await GetOrganizationEventsAsync(organization.Id.Value);
+
+                // Load organization members
+                orgMembers = await _organizationService.GetOrganizationMembersAsync(organization.Id.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading organization: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<List<GoodWorksModel>> GetOrganizationEventsAsync(long organizationId)
+    {
+        Console.WriteLine($"DEBUG: Loading events for organization ID: {organizationId}");
+        
+        // Create a session to query events posted by this organization
+        using var session = _neo4jService.GetSession();
+        
+        // First, let's check if the relationship exists
+        var checkQuery = @"
+            MATCH (o:Organization)
+            WHERE id(o) = $orgId
+            OPTIONAL MATCH (o)<-[:POSTED_BY]-(g:GoodWork)
+            RETURN count(g) as eventCount, collect(g.name) as eventNames";
+
+        var checkResult = await session.ExecuteReadAsync(async tx =>
+        {
+            var cursor = await tx.RunAsync(checkQuery, new { orgId = organizationId });
+            var record = await cursor.SingleAsync();
+            var count = record["eventCount"].As<int>();
+            var names = record["eventNames"].As<List<object>>();
+            Console.WriteLine($"DEBUG: Found {count} events for organization");
+            foreach (var name in names)
+            {
+                Console.WriteLine($"DEBUG: Event name: {name}");
+            }
+            return count;
+        });
+
+        var query = @"
+            MATCH (g:GoodWork)-[:POSTED_BY]->(o:Organization)
+            WHERE id(o) = $orgId AND g.status = 'Active'
+            OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
+            OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
+            OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)
+            RETURN id(g) AS Id, g, c, cat, l
+            ORDER BY g.startTime DESC";
+
+        var result = await session.ExecuteReadAsync(async tx =>
+        {
+            var cursor = await tx.RunAsync(query, new { orgId = organizationId });
+            var events = new List<GoodWorksModel>();
+
+            await foreach (var record in cursor)
+            {
+                var gNode = record["g"].As<INode>();
+                var props = gNode.Properties;
+                
+                Console.WriteLine($"DEBUG: Found event: {props["name"].As<string>()} (ID: {record["Id"].As<long>()})");
+                
+                var evt = new GoodWorksModel
+                {
+                    Id = record["Id"].As<long>(),
+                    Name = props["name"].As<string>(),
+                    Description = props.ContainsKey("description") ? props["description"].As<string>() : "",
+                    Category = props.ContainsKey("category") ? props["category"].As<string>() : "",
+                    Latitude = props.ContainsKey("latitude") ? props["latitude"].As<double>() : 0,
+                    Longitude = props.ContainsKey("longitude") ? props["longitude"].As<double>() : 0,
+                    Status = props.ContainsKey("status") ? props["status"].As<string>() : "Active"
+                };
+
+                if (props.ContainsKey("startTime") && props["startTime"] != null)
+                {
+                    evt.StartTime = props["startTime"].As<ZonedDateTime?>()?.ToDateTimeOffset().DateTime;
+                }
+
+                events.Add(evt);
+            }
+
+            Console.WriteLine($"DEBUG: Returning {events.Count} events");
+            return events;
+        });
+
+        return result;
+    }
+
+    private async Task JoinOrganization()
+    {
+        if (organization == null || string.IsNullOrEmpty(userId)) return;
+
+        try
+        {
+            await _organizationService.AddMemberAsync(organization.Id.Value, userId);
+            await LoadOrganization(); // Reload to update member status
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error joining organization: {ex.Message}");
+        }
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return "?";
+        
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        }
+        return parts[0][0].ToString().ToUpper();
+    }
+}

@@ -1,0 +1,265 @@
+@page "/organizations/{Slug}/members"
+@using CharityRabbit.Models
+@using CharityRabbit.Data
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@inject OrganizationService _organizationService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@attribute [Authorize]
+
+<PageTitle>Manage Members - @(organization?.Name ?? "Organization") - CharityRabbit</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else if (organization == null)
+    {
+        <MudAlert Severity="Severity.Warning">Organization not found or you don't have permission to manage members.</MudAlert>
+    }
+    else
+    {
+        <div class="d-flex justify-space-between align-center mb-4">
+            <div>
+                <MudText Typo="Typo.h3">Manage Members</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary">@organization.Name</MudText>
+            </div>
+            <MudButton Variant="Variant.Outlined" 
+                     Color="Color.Default"
+                     StartIcon="@Icons.Material.Filled.ArrowBack"
+                     Href="@($"/organizations/{Slug}")">
+                Back to Organization
+            </MudButton>
+        </div>
+
+        <!-- Invite Member Section -->
+        <MudPaper Elevation="2" Class="pa-4 mb-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">Invite New Member</MudText>
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                Members must have an account on CharityRabbit to be added to your organization.
+            </MudAlert>
+            <MudText Typo="Typo.body2">
+                Share your organization page link with potential members: 
+                <strong>https://charityrabbit.com/organizations/@organization.Slug</strong>
+            </MudText>
+            <MudText Typo="Typo.body2" Class="mt-2">
+                They can join by clicking the "Join Organization" button on your page.
+            </MudText>
+        </MudPaper>
+
+        <!-- Members List -->
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudText Typo="Typo.h5" GutterBottom="true">
+                Members (@members.Count)
+            </MudText>
+
+            @if (!members.Any())
+            {
+                <MudAlert Severity="Severity.Info">
+                    No members yet. Share your organization page to invite people!
+                </MudAlert>
+            }
+            else
+            {
+                <MudTable Items="@members" Hover="true" Breakpoint="Breakpoint.Sm">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Email</MudTh>
+                        <MudTh>Role</MudTh>
+                        <MudTh>Joined Date</MudTh>
+                        <MudTh>Events Created</MudTh>
+                        <MudTh>Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Name">
+                            <div class="d-flex align-center gap-2">
+                                <MudAvatar Color="Color.Primary" Size="Size.Small">
+                                    @GetInitials(context.Name)
+                                </MudAvatar>
+                                <span>@context.Name</span>
+                            </div>
+                        </MudTd>
+                        <MudTd DataLabel="Email">@context.Email</MudTd>
+                        <MudTd DataLabel="Role">
+                            <MudChip T="string" 
+                                   Size="Size.Small" 
+                                   Color="@(context.Role == "Admin" ? Color.Error : Color.Info)">
+                                @context.Role
+                            </MudChip>
+                        </MudTd>
+                        <MudTd DataLabel="Joined">
+                            @context.JoinedDate.ToString("MMM dd, yyyy")
+                        </MudTd>
+                        <MudTd DataLabel="Events">
+                            @context.ContributedEvents
+                        </MudTd>
+                        <MudTd DataLabel="Actions">
+                            @if (context.UserId != userId)
+                            {
+                                @if (context.Role != "Admin")
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings" 
+                                                 Color="Color.Primary"
+                                                 Size="Size.Small"
+                                                 Title="Promote to Admin"
+                                                 OnClick="@(() => PromoteToAdmin(context))" />
+                                }
+                                <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" 
+                                             Color="Color.Error"
+                                             Size="Size.Small"
+                                             Title="Remove Member"
+                                             OnClick="@(() => RemoveMember(context))" />
+                            }
+                            else
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default">
+                                    You
+                                </MudChip>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudPaper>
+
+        <!-- Admin Info -->
+        <MudPaper Elevation="1" Class="pa-3 mt-4">
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                <strong>Note:</strong> Admins can edit organization details, manage members, and create events. 
+                Regular members can only view organization information.
+            </MudText>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+
+    private OrganizationModel? organization;
+    private List<OrganizationMemberModel> members = new();
+    private bool isLoading = true;
+    private string? userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+
+        try
+        {
+            organization = await _organizationService.GetOrganizationBySlugAsync(Slug, userId);
+            
+            if (organization != null)
+            {
+                // Check if user is admin
+                if (!organization.IsUserAdmin)
+                {
+                    organization = null; // Hide from non-admins
+                    return;
+                }
+
+                // Load members
+                members = await _organizationService.GetOrganizationMembersAsync(organization.Id!.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading data: {ex.Message}");
+            Snackbar.Add("Error loading organization members", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task PromoteToAdmin(OrganizationMemberModel member)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Promote to Admin",
+            $"Are you sure you want to promote {member.Name} to Admin? They will have full control over the organization.",
+            yesText: "Promote",
+            cancelText: "Cancel"
+        );
+
+        if (confirmed == true && organization != null)
+        {
+            try
+            {
+                var success = await _organizationService.PromoteToAdminAsync(organization.Id!.Value, member.UserId);
+                
+                if (success)
+                {
+                    Snackbar.Add($"{member.Name} promoted to Admin", Severity.Success);
+                    await LoadData();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to promote member", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error promoting member: {ex.Message}");
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task RemoveMember(OrganizationMemberModel member)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Remove Member",
+            $"Are you sure you want to remove {member.Name} from the organization?",
+            yesText: "Remove",
+            cancelText: "Cancel"
+        );
+
+        if (confirmed == true && organization != null)
+        {
+            try
+            {
+                var success = await _organizationService.RemoveMemberAsync(organization.Id!.Value, member.UserId);
+                
+                if (success)
+                {
+                    Snackbar.Add($"{member.Name} removed from organization", Severity.Success);
+                    await LoadData();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to remove member", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error removing member: {ex.Message}");
+                Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return "?";
+        
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        }
+        return parts[0][0].ToString().ToUpper();
+    }
+}

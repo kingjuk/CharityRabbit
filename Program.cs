@@ -9,6 +9,7 @@ using MLS.Api.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using CharityRabbit.Models;
+using Neo4j.Driver;
 
 internal class Program
 {
@@ -22,11 +23,18 @@ internal class Program
 
         builder.Services.Configure<Neo4jSettings>(builder.Configuration.GetSection("Neo4jSettings"));
 
-        builder.Services.AddSingleton<Neo4jService>(sp =>
+        // Register IDriver as singleton
+        builder.Services.AddSingleton<IDriver>(sp =>
         {
             var neo4jSettings = sp.GetRequiredService<IOptions<Neo4jSettings>>().Value;
+            return GraphDatabase.Driver(neo4jSettings.Uri, AuthTokens.Basic(neo4jSettings.Username, neo4jSettings.Password));
+        });
+
+        builder.Services.AddSingleton<Neo4jService>(sp =>
+        {
+            var driver = sp.GetRequiredService<IDriver>();
             var locationServices = sp.GetRequiredService<GeocodingService>();
-            return new Neo4jService(neo4jSettings.Uri, neo4jSettings.Username, neo4jSettings.Password, locationServices);
+            return new Neo4jService(driver, locationServices);
         });
 
         builder.Services.AddHttpClient<GeocodingService>();
@@ -34,6 +42,7 @@ internal class Program
         builder.Services.AddScoped<TestDataService>();
         builder.Services.AddScoped<RecurringEventService>();
         builder.Services.AddScoped<SeoService>();
+        builder.Services.AddScoped<OrganizationService>();
 
         var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"] ?? throw new InvalidOperationException("GoogleMaps API key is missing in configuration.");
 

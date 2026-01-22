@@ -8,8 +8,10 @@
 @using MudBlazor
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
+@using Neo4j.Driver
 
 @inject Neo4jService _neo4jService
+@inject OrganizationService _organizationService
 @inject GooglePlacesService _googlePlacesService
 @inject GeocodingService _geoCodingServices
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -27,6 +29,40 @@
             <MudItem xs="12" sm="6">
                 <MudCard>
                     <MudCardContent>
+                        <!-- Organization Selector -->
+                        @if (userOrganizations?.Any() == true)
+                        {
+                            <MudAlert Severity="MudBlazor.Severity.Info" Dense="true" Class="mb-3">
+                                You can post this event as yourself or as an organization you're part of.
+                            </MudAlert>
+                            
+                            <MudSelect Label="Post As" @bind-Value="selectedOrganizationId" Class="mb-3" Variant="Variant.Outlined">
+                                <MudSelectItem Value="@((long?)null)">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="MudBlazor.Size.Small" />
+                                        Post as Individual
+                                    </div>
+                                </MudSelectItem>
+                                @foreach (var org in userOrganizations.Where(o => o.IsUserAdmin))
+                                {
+                                    <MudSelectItem Value="@org.Id">
+                                        <div class="d-flex align-center gap-2">
+                                            <MudIcon Icon="@Icons.Material.Filled.Business" Size="MudBlazor.Size.Small" Color="Color.Primary" />
+                                            @org.Name
+                                            <MudChip T="string" Size="MudBlazor.Size.Small" Color="Color.Error">Admin</MudChip>
+                                        </div>
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                            
+                            @if (selectedOrganizationId.HasValue)
+                            {
+                                <MudAlert Severity="MudBlazor.Severity.Success" Dense="true" Class="mb-3">
+                                    <strong>Posting as:</strong> @userOrganizations.FirstOrDefault(o => o.Id == selectedOrganizationId)?.Name
+                                </MudAlert>
+                            }
+                        }
+
                         <MudTextField Label="Name" HelperText="Enter the project name"
                                       @bind-Value="goodWork.Name" For="@(() => goodWork.Name)" />
 
@@ -152,7 +188,7 @@
                         }
                         else if (!string.IsNullOrEmpty(errorMessage))
                         {
-                            <MudAlert Severity="Severity.Error" Class="mt-3">@errorMessage</MudAlert>
+                            <MudAlert Severity="MudBlazor.Severity.Error" Class="mt-3">@errorMessage</MudAlert>
                         }
                         else
                         {
@@ -198,6 +234,10 @@
     private string selectedRecurrenceType = "WEEKLY";
     private int recurrenceInterval = 1;
     private List<DayOfWeek> selectedDays = new();
+    
+    // Organization fields
+    private List<OrganizationModel>? userOrganizations;
+    private long? selectedOrganizationId;
 
     private readonly List<string> _predefinedCategories = new()
     {
@@ -221,6 +261,12 @@
         if (user.Identity?.IsAuthenticated == true)
         {
             userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            
+            // Load user's organizations (where they are admin)
+            if (!string.IsNullOrEmpty(userId))
+            {
+                userOrganizations = await _organizationService.GetUserOrganizationsAsync(userId);
+            }
         }
 
         _mapOptions = new MapOptions
@@ -379,7 +425,36 @@
             // Build recurrence pattern before saving
             BuildRecurrencePattern();
 
+            // Set organization fields if posting as organization
+            if (selectedOrganizationId.HasValue)
+            {
+                var selectedOrg = userOrganizations?.FirstOrDefault(o => o.Id == selectedOrganizationId);
+                if (selectedOrg != null)
+                {
+                    goodWork.IsOrganizationPost = true;
+                    goodWork.OrganizationId = selectedOrg.Id;
+                    goodWork.OrganizationSlug = selectedOrg.Slug;
+                    goodWork.OrganizationName = selectedOrg.Name;
+                }
+            }
+            else
+            {
+                goodWork.IsOrganizationPost = false;
+                goodWork.OrganizationId = null;
+                goodWork.OrganizationSlug = null;
+                goodWork.OrganizationName = null;
+            }
+
+            goodWork.CreatedBy = userId ?? "";
+
             await _neo4jService.CreateGoodWorkAsync(goodWork, userId);
+            
+            // Create POSTED_BY relationship if it's an organization post
+            if (goodWork.IsOrganizationPost && goodWork.Id.HasValue && goodWork.OrganizationId.HasValue)
+            {
+                await CreateGoodWorkOrganizationRelationship(goodWork.Id.Value, goodWork.OrganizationId.Value);
+            }
+            
             success = true;
             errorMessage = null;
 
@@ -387,6 +462,7 @@
             await Task.Delay(1500);
             goodWork = new GoodWorksModel { CreatedDate = DateTime.UtcNow };
             selectedDays.Clear();
+            selectedOrganizationId = null;
             success = false;
 
             if (_marker != null)
@@ -401,5 +477,21 @@
             errorMessage = $"Error creating good work: {ex.Message}";
             success = false;
         }
+    }
+
+    private async Task CreateGoodWorkOrganizationRelationship(long goodWorkId, long organizationId)
+    {
+        Console.WriteLine($"DEBUG: Creating POSTED_BY relationship - GoodWork ID: {goodWorkId}, Organization ID: {organizationId}");
+        
+        var query = @"
+            MATCH (g:GoodWork), (o:Organization)
+            WHERE id(g) = $goodWorkId AND id(o) = $organizationId
+            MERGE (g)-[:POSTED_BY]->(o)
+            RETURN count(*) as count";
+
+        await using var session = _neo4jService.GetSession();
+        await session.RunAsync(query, new { goodWorkId, organizationId });
+        
+        Console.WriteLine($"DEBUG: POSTED_BY relationship created successfully");
     }
 }
