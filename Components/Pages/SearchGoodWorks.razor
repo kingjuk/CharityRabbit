@@ -6,6 +6,8 @@
 @using MouseEvent = GoogleMapsComponents.Maps.MouseEvent
 @inject Neo4jService _neo4jService
 @inject SeoService _seoService
+@inject SkillService _skillService
+@inject IJSRuntime JSRuntime
 
 <PageTitle>Search Volunteer Opportunities - CharityRabbit</PageTitle>
 
@@ -42,13 +44,35 @@
                                 }
                             </MudSelect>
 
-                            <!-- Effort Level -->
-                            <MudSelect @bind-Value="searchCriteria.EffortLevel" Label="Effort Level" Clearable="true" Class="mb-3">
-                                <MudSelectItem Value="@((string?)null)">Any Effort</MudSelectItem>
-                                <MudSelectItem Value="@("Light")">Light</MudSelectItem>
-                                <MudSelectItem Value="@("Moderate")">Moderate</MudSelectItem>
-                                <MudSelectItem Value="@("Heavy")">Heavy</MudSelectItem>
-                            </MudSelect>
+                            <!-- Skills Filter -->
+                            <MudText Typo="Typo.subtitle2" Class="mb-2">Required Skills</MudText>
+                            <MudAutocomplete T="string"
+                                             Label="Add Skill Filter"
+                                             SearchFunc="SearchSkills"
+                                             @bind-Value="selectedSkillFilter"
+                                             Clearable="true"
+                                             Dense="true"
+                                             Class="mb-2"
+                                             HelperText="Filter by required skills"
+                                             CoerceValue="false"
+                                             ResetValueOnEmptyText="true"
+                                             @onblur="OnSkillFilterBlur" />
+
+                            @if (selectedSkills.Any())
+                            {
+                                <div class="d-flex flex-wrap gap-1 mb-3">
+                                    @foreach (var skill in selectedSkills)
+                                    {
+                                        <MudChip T="string"
+                                               Text="@skill"
+                                               Size="MudBlazor.Size.Small"
+                                               Color="Color.Primary"
+                                               OnClose="@(() => RemoveSkillFilter(skill))">
+                                            @skill
+                                        </MudChip>
+                                    }
+                                </div>
+                            }
 
                             <!-- Date Range -->
                             <MudDatePicker @bind-Date="startDateFrom" Label="Start Date From" Class="mb-3" />
@@ -125,7 +149,6 @@
                                         </CellTemplate>
                                     </PropertyColumn>
                                     <PropertyColumn Property="x => x.Category" Title="Category" />
-                                    <PropertyColumn Property="x => x.EffortLevel" Title="Effort" />
                                     <PropertyColumn Property="x => x.StartTime" Title="Date">
                                         <CellTemplate>
                                             @if (context.Item.StartTime.HasValue)
@@ -181,13 +204,6 @@
                                 {
                                     <MudSelectItem Value="@category">@category</MudSelectItem>
                                 }
-                            </MudSelect>
-
-                            <MudSelect @bind-Value="searchCriteria.EffortLevel" Label="Effort Level" Clearable="true" Class="mb-3">
-                                <MudSelectItem Value="@((string?)null)">Any Effort</MudSelectItem>
-                                <MudSelectItem Value="@("Light")">Light</MudSelectItem>
-                                <MudSelectItem Value="@("Moderate")">Moderate</MudSelectItem>
-                                <MudSelectItem Value="@("Heavy")">Heavy</MudSelectItem>
                             </MudSelect>
 
                             <MudDatePicker @bind-Date="startDateFrom" Label="Start Date From" Class="mb-3" />
@@ -273,6 +289,8 @@
     private string? zipCode;
     private double searchRadius = 25;
     private bool availableSpotsOnly = false;
+    private List<string> selectedSkills = new();
+    private string? selectedSkillFilter;
 
     private readonly List<string> categories = new()
     {
@@ -325,15 +343,52 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Try to get user's location, fall back to Huntsville, AL
+        var userLocation = await TryGetUserLocation();
+        
         _mapOptions = new MapOptions
         {
             Zoom = 11,
-            Center = new LatLngLiteral(34.7304, -86.5861),
+            Center = userLocation,
             MapTypeId = MapTypeId.Roadmap
         };
 
         // Auto-load upcoming events on page load
         await LoadUpcomingEvents();
+    }
+
+    private async Task<LatLngLiteral> TryGetUserLocation()
+    {
+        // Default location (Huntsville, AL)
+        var defaultLocation = new LatLngLiteral(34.7304, -86.5861);
+        
+        try
+        {
+            // Try to get user's current location from browser
+            var result = await JSRuntime.InvokeAsync<GeolocationResult?>("geolocationHelper.getCurrentPosition");
+            
+            if (result != null && result.Latitude != 0 && result.Longitude != 0)
+            {
+                Console.WriteLine($"User location detected: {result.Latitude}, {result.Longitude}");
+                return new LatLngLiteral(result.Latitude, result.Longitude);
+            }
+            
+            Console.WriteLine("Using default location (Huntsville, AL)");
+            return defaultLocation;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Geolocation error: {ex.Message}. Using default location.");
+            return defaultLocation;
+        }
+    }
+
+    // Helper class for geolocation result
+    private class GeolocationResult
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double Accuracy { get; set; }
     }
 
     private async Task LoadUpcomingEvents()
@@ -415,11 +470,48 @@
         zipCode = null;
         searchRadius = 25;
         availableSpotsOnly = false;
+        selectedSkills.Clear();
         searchResults = null;
         filteredResults = new();
         
         // Clear map markers
         ClearMarkers();
+    }
+
+    private async Task<IEnumerable<string>> SearchSkills(string value, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            var all = await _skillService.GetAllSkillsAsync();
+            return all.Select(s => s.Name).Take(20);
+        }
+        var skills = await _skillService.SearchSkillsAsync(value);
+        return skills.Select(s => s.Name);
+    }
+
+    private void OnSkillFilterBlur()
+    {
+        if (!string.IsNullOrWhiteSpace(selectedSkillFilter))
+        {
+            AddSkillFilter(selectedSkillFilter);
+            selectedSkillFilter = null; // Clear the field after adding
+        }
+    }
+
+    private void AddSkillFilter(string skill)
+    {
+        if (string.IsNullOrWhiteSpace(skill)) return;
+        if (!selectedSkills.Contains(skill, StringComparer.OrdinalIgnoreCase))
+        {
+            selectedSkills.Add(skill);
+            searchCriteria.RequiredSkills = selectedSkills;
+        }
+    }
+
+    private void RemoveSkillFilter(string skill)
+    {
+        selectedSkills.Remove(skill);
+        searchCriteria.RequiredSkills = selectedSkills.Any() ? selectedSkills : null;
     }
 
     private async Task OnMapInitialized()
@@ -497,9 +589,6 @@
                                 <div style='margin-bottom: 12px;'>
                                     <span style='background: #E3F2FD; color: #1976D2; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;'>
                                         {goodWorkForClosure.Category}
-                                    </span>
-                                    <span style='background: #FFF3E0; color: #F57C00; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;'>
-                                        {goodWorkForClosure.EffortLevel}
                                     </span>
                                 </div>
 

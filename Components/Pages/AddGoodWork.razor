@@ -15,6 +15,8 @@
 @inject GooglePlacesService _googlePlacesService
 @inject GeocodingService _geoCodingServices
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject SkillService _skillService
+@inject IJSRuntime JSRuntime
 @attribute [Authorize]
 
 <PageTitle>Add Good Work - Charity Rabbit</PageTitle>
@@ -22,7 +24,7 @@
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4 mt-4">
     <MudText Typo="Typo.h3" GutterBottom="true">Create New Good Work</MudText>
 
-    <EditForm Model="@goodWork" OnValidSubmit="OnValidSubmit" FormName="AddGoodWorkForm">
+    <EditForm Model="@goodWork" OnValidSubmit="OnValidSubmit">
         <DataAnnotationsValidator />
         <MudGrid>
             <!-- Form Section -->
@@ -119,11 +121,42 @@
                         <MudTextField Label="Contact Phone" @bind-Value="goodWork.ContactPhone"
                                       For="@(() => goodWork.ContactPhone)" Class="mt-3" />
 
-                        <MudSelect Label="Effort Level" @bind-Value="goodWork.EffortLevel" Class="mt-3">
-                            <MudSelectItem Value=@("Light")>Light</MudSelectItem>
-                            <MudSelectItem Value=@("Moderate")>Moderate</MudSelectItem>
-                            <MudSelectItem Value=@("Heavy")>Heavy</MudSelectItem>
-                        </MudSelect>
+                        <!-- Skills Selector -->
+                        <MudDivider Class="my-4" />
+                        <MudText Typo="Typo.h6" Class="mb-2">Required Skills</MudText>
+                        <MudAlert Severity="MudBlazor.Severity.Info" Dense="true" Class="mb-2">
+                            Select skills volunteers should have. Leave empty for "No Skills Required"
+                        </MudAlert>
+
+                        <MudAutocomplete T="string"
+                                         Label="Add Skill"
+                                         SearchFunc="SearchSkills"
+                                         @bind-Value="selectedSkill"
+                                         Clearable="true"
+                                         Dense="false"
+                                         Variant="Variant.Outlined"
+                                         HelperText="Type to search or add new skills"
+                                         Class="mb-3"
+                                         CoerceText="true"
+                                         CoerceValue="false"
+                                         ResetValueOnEmptyText="true"
+                                         @onblur="OnSkillBlur" />
+
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            @foreach (var skill in goodWork.RequiredSkills)
+                            {
+                                <MudChip T="string" 
+                                       Text="@skill" 
+                                       Color="Color.Primary"
+                                       OnClose="@(() => RemoveSkill(skill))">
+                                    @skill
+                                </MudChip>
+                            }
+                            @if (!goodWork.RequiredSkills.Any())
+                            {
+                                <MudChip T="string" Color="Color.Success" Icon="@Icons.Material.Filled.Check">No Skills Required</MudChip>
+                            }
+                        </div>
 
                         <MudNumericField Label="Max Participants" @bind-Value="goodWork.MaxParticipants" 
                                        Class="mt-3" Min="0" HideSpinButtons="true" />
@@ -210,8 +243,20 @@
             <MudItem xs="12" sm="6">
                 <MudPaper Elevation="4" Class="pa-4">
                     <MudText Typo="Typo.h5" Class="mb-2">Location Map</MudText>
-                    <GoogleMap @ref="_map" Options="@_mapOptions" Height="600px" OnAfterInit="InitializeMap">
-                    </GoogleMap>
+                    @if (mapError)
+                    {
+                        <MudAlert Severity="MudBlazor.Severity.Warning" Class="mb-2">
+                            Map failed to load. You can still create the event - the location will be saved based on the address you entered.
+                        </MudAlert>
+                    }
+                    <div style="height: 600px; width: 100%;">
+                        <GoogleMap @ref="_map" 
+                                   Id="addGoodWorkMap" 
+                                   Options="@_mapOptions" 
+                                   Height="100%" 
+                                   OnAfterInit="InitializeMap">
+                        </GoogleMap>
+                    </div>
                 </MudPaper>
             </MudItem>
         </MudGrid>
@@ -222,7 +267,9 @@
     private GoodWorksModel goodWork = new GoodWorksModel();
     private bool success;
     private string? errorMessage;
+    private bool mapError = false;
     private string? userId;
+    private string? selectedSkill;
     private GoogleMap? _map;
     private MapOptions _mapOptions = new();
     private Marker? _marker;
@@ -269,14 +316,51 @@
             }
         }
 
+        // Try to get user's location, fall back to Huntsville, AL
+        var userLocation = await TryGetUserLocation();
+
         _mapOptions = new MapOptions
         {
             Zoom = 12,
-            Center = new LatLngLiteral(34.7304, -86.5861),
+            Center = userLocation,
             MapTypeId = MapTypeId.Roadmap
         };
 
         goodWork.CreatedDate = DateTime.UtcNow;
+    }
+
+    private async Task<LatLngLiteral> TryGetUserLocation()
+    {
+        // Default location (Huntsville, AL)
+        var defaultLocation = new LatLngLiteral(34.7304, -86.5861);
+        
+        try
+        {
+            // Try to get user's current location from browser
+            var result = await JSRuntime.InvokeAsync<GeolocationResult?>("geolocationHelper.getCurrentPosition");
+            
+            if (result != null && result.Latitude != 0 && result.Longitude != 0)
+            {
+                Console.WriteLine($"User location detected: {result.Latitude}, {result.Longitude}");
+                return new LatLngLiteral(result.Latitude, result.Longitude);
+            }
+            
+            Console.WriteLine("Using default location (Huntsville, AL)");
+            return defaultLocation;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Geolocation error: {ex.Message}. Using default location.");
+            return defaultLocation;
+        }
+    }
+
+    // Helper class for geolocation result
+    private class GeolocationResult
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double Accuracy { get; set; }
     }
 
     private string GetIntervalHelperText()
@@ -358,6 +442,45 @@
         return Task.FromResult<IEnumerable<string>>(filtered);
     }
 
+    private async Task<IEnumerable<string>> SearchSkills(string value, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            // Show predefined skills by category
+            var predefined = _skillService.GetPredefinedSkills();
+            return predefined.SelectMany(kvp => kvp.Value).Take(20);
+        }
+
+        var skills = await _skillService.SearchSkillsAsync(value);
+        var skillNames = skills.Select(s => s.Name).ToList();
+        
+        // Add typed value as option if not in results
+        if (!skillNames.Any(s => s.Equals(value, StringComparison.OrdinalIgnoreCase)))
+        {
+            skillNames.Insert(0, value);
+        }
+        
+        return skillNames;
+    }
+
+    private void OnSkillBlur()
+    {
+        if (!string.IsNullOrWhiteSpace(selectedSkill))
+        {
+            AddSkill(selectedSkill);
+            selectedSkill = null; // Clear the field after adding
+        }
+    }
+
+    private void AddSkill(string skill)
+    {
+        if (string.IsNullOrWhiteSpace(skill)) return;
+        if (goodWork.RequiredSkills.Contains(skill, StringComparer.OrdinalIgnoreCase)) return;
+        
+        goodWork.RequiredSkills.Add(skill);
+        StateHasChanged();
+    }
+
     private async Task OnAddressChanged(string address)
     {
         if (string.IsNullOrEmpty(address)) return;
@@ -373,31 +496,68 @@
 
     private async Task InitializeMap()
     {
-        if (goodWork.Latitude != 0 && goodWork.Longitude != 0)
+        try
         {
+            if (_map?.InteropObject == null)
+            {
+                Console.WriteLine("Map not yet initialized, waiting...");
+                mapError = true;
+                StateHasChanged();
+                return;
+            }
+
+            mapError = false;
+
+            // Set default center if no location specified
+            if (goodWork.Latitude == 0 && goodWork.Longitude == 0)
+            {
+                goodWork.Latitude = 34.7304;
+                goodWork.Longitude = -86.5861;
+            }
+
             await UpdateMapLocation(goodWork.Latitude, goodWork.Longitude);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing map: {ex.Message}");
+            mapError = true;
+            StateHasChanged();
         }
     }
 
     private async Task UpdateMapLocation(double latitude, double longitude)
     {
-        if (_map == null) return;
-
-        var position = new LatLngLiteral(latitude, longitude);
-
-        await _map.InteropObject.SetCenter(position);
-
-        if (_marker != null)
+        if (_map?.InteropObject == null)
         {
-            await _marker.SetMap(null);
+            Console.WriteLine("Map InteropObject is null, cannot update location");
+            return;
         }
 
-        _marker = await Marker.CreateAsync(_map.JsRuntime, new MarkerOptions
+        try
         {
-            Position = position,
-            Map = _map.InteropObject,
-            Title = "Selected Location"
-        });
+            var position = new LatLngLiteral(latitude, longitude);
+
+            await _map.InteropObject.SetCenter(position);
+            await _map.InteropObject.SetZoom(12);
+
+            if (_marker != null)
+            {
+                await _marker.SetMap(null);
+            }
+
+            _marker = await Marker.CreateAsync(_map.JsRuntime, new MarkerOptions
+            {
+                Position = position,
+                Map = _map.InteropObject,
+                Title = "Selected Location"
+            });
+
+            Console.WriteLine($"Map updated to: {latitude}, {longitude}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating map location: {ex.Message}");
+        }
     }
 
     private async Task OnValidSubmit()
@@ -493,5 +653,11 @@
         await session.RunAsync(query, new { goodWorkId, organizationId });
         
         Console.WriteLine($"DEBUG: POSTED_BY relationship created successfully");
+    }
+
+    private void RemoveSkill(string skill)
+    {
+        goodWork.RequiredSkills.Remove(skill);
+        StateHasChanged();
     }
 }

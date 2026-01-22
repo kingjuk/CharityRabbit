@@ -45,7 +45,7 @@ namespace CharityRabbit.Models
         [Phone]
         public string ContactPhone { get; set; } = string.Empty;
 
-        public string EffortLevel { get; set; } = "Moderate";
+        public string? EffortLevel { get; set; } // Optional - being replaced by skills
 
         public bool IsAccessible { get; set; } = false;
         public bool IsVirtual { get; set; } = false;

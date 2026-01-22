@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor.Services;
 using CharityRabbit.Components;
 using CharityRabbit.Components.Account;
@@ -10,6 +9,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using CharityRabbit.Models;
 using Neo4j.Driver;
+using Microsoft.AspNetCore.Components.Authorization;
 
 internal class Program
 {
@@ -43,6 +43,7 @@ internal class Program
         builder.Services.AddScoped<RecurringEventService>();
         builder.Services.AddScoped<SeoService>();
         builder.Services.AddScoped<OrganizationService>();
+        builder.Services.AddScoped<SkillService>();
 
         var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"] ?? throw new InvalidOperationException("GoogleMaps API key is missing in configuration.");
 
@@ -125,6 +126,21 @@ internal class Program
             .AddInteractiveServerRenderMode();
 
         app.MapGroup("/authentication").MapLoginAndLogout();
+
+        // Initialize predefined skills on startup
+        using (var scope = app.Services.CreateScope())
+        {
+            try
+            {
+                var skillService = scope.ServiceProvider.GetRequiredService<SkillService>();
+                await skillService.InitializePredefinedSkillsAsync();
+                Console.WriteLine("Predefined skills initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not initialize skills: {ex.Message}");
+            }
+        }
 
         // SEO: Sitemap endpoint
         app.MapGet("/sitemap.xml", async (Neo4jService neo4jService, SeoService seoService) =>
