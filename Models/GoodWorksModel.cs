@@ -133,6 +133,8 @@ namespace CharityRabbit.Models
         public bool? FamilyFriendly { get; set; }
         public List<string>? RequiredSkills { get; set; }
         public bool? HasAvailableSpots { get; set; }
-        public string? SearchText { get; set; }
+        public string? SearchText { get; set; } // Fuzzy search by name/description
+        public int Page { get; set; } = 1; // Current page (1-indexed)
+        public int PageSize { get; set; } = 50; // Items per page
     }
 }

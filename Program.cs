@@ -1,15 +1,17 @@
-using MudBlazor.Services;
 using CharityRabbit.Components;
 using CharityRabbit.Components.Account;
 using CharityRabbit.Data;
-using Microsoft.Extensions.Options;
-using GoogleMapsComponents;
-using MLS.Api.Services;
-using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using CharityRabbit.Models;
-using Neo4j.Driver;
+using GoogleMapsComponents;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Options;
+using MLS.Api.Services;
+using MudBlazor.Services;
+using Neo4j.Driver;
+using Serilog;
+using Serilog.Events;
 
 internal class Program
 {
@@ -18,6 +20,11 @@ internal class Program
     private async static Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+
+        builder.Host.UseSerilog((hostingContext, loggerConfiguration) => loggerConfiguration.ReadFrom.Configuration(hostingContext.Configuration), false);
+
+        // Health check
+        builder.Services.AddHealthChecks();
 
         builder.Services.AddHttpContextAccessor();
 
@@ -116,6 +123,22 @@ internal class Program
         {
             context.Request.Scheme = "https";
             return next();
+        });
+
+        // Configure request logging to use Debug level
+        app.UseSerilogRequestLogging(options =>
+        {
+            options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+            {
+                // Attempt to get the remote IP address and add it to the diagnostic context
+                var remoteIpAddress = httpContext.Connection.RemoteIpAddress;
+                diagnosticContext.Set("ClientIP", remoteIpAddress?.ToString());
+            };
+            options.GetLevel = (context, _, ex) =>
+                context.Response.StatusCode >= StatusCodes.Status400BadRequest || ex != null
+                    ? LogEventLevel.Warning
+                    : LogEventLevel.Debug;
+            options.IncludeQueryInRequestPath = true;
         });
 
         app.UseAuthentication();

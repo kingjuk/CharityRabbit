@@ -268,7 +268,7 @@ public class OrganizationService
         {
             var whereClause = string.IsNullOrEmpty(searchTerm)
                 ? "WHERE o.status = 'Active'"
-                : "WHERE o.status = 'Active' AND (toLower(o.name) CONTAINS toLower($searchTerm) OR toLower(o.description) CONTAINS toLower($searchTerm))";
+                : "WHERE o.status = 'Active' AND (toLower(o.name) CONTAINS toLower($searchTerm) OR toLower(o.description) CONTAINS toLower($searchTerm) OR toLower(o.city) CONTAINS toLower($searchTerm))";
 
             var query = $@"
                 MATCH (o:Organization)
@@ -308,6 +308,30 @@ public class OrganizationService
             }
 
             return organizations;
+        });
+    }
+
+    /// <summary>
+    /// Count organizations (with optional search)
+    /// </summary>
+    public async Task<int> CountOrganizationsAsync(string? searchTerm = null)
+    {
+        await using var session = _driver.AsyncSession();
+
+        return await session.ExecuteReadAsync(async tx =>
+        {
+            var whereClause = string.IsNullOrEmpty(searchTerm)
+                ? "WHERE o.status = 'Active'"
+                : "WHERE o.status = 'Active' AND (toLower(o.name) CONTAINS toLower($searchTerm) OR toLower(o.description) CONTAINS toLower($searchTerm) OR toLower(o.city) CONTAINS toLower($searchTerm))";
+
+            var query = $@"
+                MATCH (o:Organization)
+                {whereClause}
+                RETURN count(o) as totalCount";
+
+            var cursor = await tx.RunAsync(query, new { searchTerm });
+            var record = await cursor.SingleAsync();
+            return record["totalCount"].As<int>();
         });
     }
 

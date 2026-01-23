@@ -245,6 +245,19 @@ public class Neo4jService : IDisposable
             parameters["tags"] = criteria.Tags;
         }
 
+        if (criteria.RequiredSkills != null && criteria.RequiredSkills.Any())
+        {
+            conditions.Add("ALL(skill IN $skills WHERE EXISTS((g)-[:REQUIRES_SKILL]->(:Skill {name: skill})))");
+            parameters["skills"] = criteria.RequiredSkills;
+        }
+
+        // Fuzzy name search using CONTAINS (case-insensitive)
+        if (!string.IsNullOrEmpty(criteria.SearchText))
+        {
+            conditions.Add("(toLower(g.name) CONTAINS toLower($searchText) OR toLower(g.description) CONTAINS toLower($searchText))");
+            parameters["searchText"] = criteria.SearchText;
+        }
+
         if (criteria.CenterLatitude.HasValue && criteria.CenterLongitude.HasValue && criteria.RadiusMiles.HasValue)
         {
             // Convert miles to degrees (approximate)
@@ -304,15 +317,30 @@ public class Neo4jService : IDisposable
 
         var whereClause = conditions.Any() ? "WHERE " + string.Join(" AND ", conditions) : "";
 
+        // Add pagination support
+        var skip = criteria.Page > 0 ? (criteria.Page - 1) * criteria.PageSize : 0;
+        parameters["skip"] = skip;
+        parameters["limit"] = criteria.PageSize > 0 ? criteria.PageSize : 100;
+
         var query = $@"
             MATCH (g:GoodWork)
             {whereClause}
             OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
             OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
             OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)
-            RETURN id(g) AS Id, g, c, cat, l
+            OPTIONAL MATCH (g)-[:TAGGED_WITH]->(t:Tag)
+            OPTIONAL MATCH (g)-[:REQUIRES_SKILL]->(s:Skill)
+            OPTIONAL MATCH (g)<-[signup:SIGNED_UP_FOR]-(u2:User)
+            
+            WITH g, c, cat, l,
+                 collect(DISTINCT t.name) AS tags,
+                 collect(DISTINCT s.name) AS skills,
+                 count(DISTINCT signup) AS signedUpCount
+            
+            RETURN id(g) AS Id, g, c, cat, l, tags, skills, signedUpCount
             ORDER BY g.startTime ASC
-            LIMIT 100";
+            SKIP $skip
+            LIMIT $limit";
 
         using var session = _driver.AsyncSession();
         var result = await session.RunAsync(query, parameters);
@@ -320,10 +348,202 @@ public class Neo4jService : IDisposable
         var goodWorks = new List<GoodWorksModel>();
         await result.ForEachAsync(record =>
         {
-            goodWorks.Add(MapRecordToGoodWork(record));
+            var goodWork = MapRecordToGoodWork(record);
+            
+            // Set signedUpCount from query result
+            if (record.ContainsKey("signedUpCount"))
+            {
+                goodWork.SignedUpCount = record["signedUpCount"].As<int?>() ?? 0;
+            }
+            
+            goodWorks.Add(goodWork);
         });
 
         return goodWorks;
+    }
+
+    public async Task<int> CountSearchResultsAsync(GoodWorksSearchCriteria criteria)
+    {
+        var conditions = new List<string>();
+        var parameters = new Dictionary<string, object>();
+
+        // Build same conditions as SearchGoodWorksAsync
+        if (!string.IsNullOrEmpty(criteria.Category))
+        {
+            conditions.Add("EXISTS((g)-[:BELONGS_TO]->(:Category {name: $category}))");
+            parameters["category"] = criteria.Category;
+        }
+
+        if (!string.IsNullOrEmpty(criteria.SubCategory))
+        {
+            conditions.Add("EXISTS((g)-[:HAS_SUBCATEGORY]->(:SubCategory {name: $subCategory}))");
+            parameters["subCategory"] = criteria.SubCategory;
+        }
+
+        if (criteria.Tags != null && criteria.Tags.Any())
+        {
+            conditions.Add("ANY(tag IN $tags WHERE EXISTS((g)-[:TAGGED_WITH]->(:Tag {name: tag})))");
+            parameters["tags"] = criteria.Tags;
+        }
+
+        if (criteria.RequiredSkills != null && criteria.RequiredSkills.Any())
+        {
+            conditions.Add("ALL(skill IN $skills WHERE EXISTS((g)-[:REQUIRES_SKILL]->(:Skill {name: skill})))");
+            parameters["skills"] = criteria.RequiredSkills;
+        }
+
+        if (!string.IsNullOrEmpty(criteria.SearchText))
+        {
+            conditions.Add("(toLower(g.name) CONTAINS toLower($searchText) OR toLower(g.description) CONTAINS toLower($searchText))");
+            parameters["searchText"] = criteria.SearchText;
+        }
+
+        if (criteria.CenterLatitude.HasValue && criteria.CenterLongitude.HasValue && criteria.RadiusMiles.HasValue)
+        {
+            var latDelta = criteria.RadiusMiles.Value / 69.0;
+            var lonDelta = criteria.RadiusMiles.Value / (69.0 * Math.Cos(criteria.CenterLatitude.Value * Math.PI / 180));
+            
+            conditions.Add(@"g.latitude >= $minLat AND g.latitude <= $maxLat AND 
+                           g.longitude >= $minLng AND g.longitude <= $maxLng");
+            parameters["minLat"] = criteria.CenterLatitude.Value - latDelta;
+            parameters["maxLat"] = criteria.CenterLatitude.Value + latDelta;
+            parameters["minLng"] = criteria.CenterLongitude.Value - lonDelta;
+            parameters["maxLng"] = criteria.CenterLongitude.Value + lonDelta;
+        }
+
+        if (criteria.StartDateFrom.HasValue)
+        {
+            conditions.Add("g.startTime >= datetime($startFrom)");
+            parameters["startFrom"] = criteria.StartDateFrom.Value.ToString("o");
+        }
+
+        if (criteria.StartDateTo.HasValue)
+        {
+            conditions.Add("g.startTime <= datetime($startTo)");
+            parameters["startTo"] = criteria.StartDateTo.Value.ToString("o");
+        }
+
+        if (!string.IsNullOrEmpty(criteria.EffortLevel))
+        {
+            conditions.Add("g.effortLevel = $effortLevel");
+            parameters["effortLevel"] = criteria.EffortLevel;
+        }
+
+        if (criteria.IsVirtual.HasValue)
+        {
+            conditions.Add("g.isVirtual = $isVirtual");
+            parameters["isVirtual"] = criteria.IsVirtual.Value;
+        }
+
+        if (criteria.IsAccessible.HasValue)
+        {
+            conditions.Add("g.isAccessible = $isAccessible");
+            parameters["isAccessible"] = criteria.IsAccessible.Value;
+        }
+
+        if (criteria.FamilyFriendly.HasValue)
+        {
+            conditions.Add("g.familyFriendly = $familyFriendly");
+            parameters["familyFriendly"] = criteria.FamilyFriendly.Value;
+        }
+
+        if (criteria.HasAvailableSpots == true)
+        {
+            conditions.Add("(g.maxParticipants IS NULL OR g.currentParticipants < g.maxParticipants)");
+        }
+
+        conditions.Add("g.status = 'Active'");
+
+        var whereClause = conditions.Any() ? "WHERE " + string.Join(" AND ", conditions) : "";
+
+        var query = $@"
+            MATCH (g:GoodWork)
+            {whereClause}
+            RETURN count(g) AS totalCount";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, parameters);
+        var record = await result.SingleAsync();
+        return record["totalCount"].As<int>();
+    }
+
+    public async Task<GoodWorksModel> GetGoodWorkWithDetailsAsync(long id, string? userId = null)
+    {
+        var query = @"
+            MATCH (g:GoodWork)
+            WHERE id(g) = $id
+            OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
+            OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
+            OPTIONAL MATCH (g)-[:HAS_SUBCATEGORY]->(subcat:SubCategory)
+            OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)
+            OPTIONAL MATCH (g)-[:TAGGED_WITH]->(t:Tag)
+            OPTIONAL MATCH (g)-[:REQUIRES_SKILL]->(s:Skill)
+            OPTIONAL MATCH (g)<-[int:INTERESTED_IN]-(u:User)
+            OPTIONAL MATCH (g)<-[signup:SIGNED_UP_FOR]-(u2:User)
+            
+            WITH g, c, cat, subcat, l, 
+                 collect(DISTINCT t.name) AS tags,
+                 collect(DISTINCT s.name) AS skills,
+                 count(DISTINCT int) AS interestedCount,
+                 count(DISTINCT signup) AS signedUpCount,
+                 CASE WHEN $userId IS NOT NULL THEN 
+                    EXISTS((g)<-[:INTERESTED_IN]-(:User {userId: $userId}))
+                 ELSE false END AS userInterested,
+                 CASE WHEN $userId IS NOT NULL THEN 
+                    EXISTS((g)<-[:SIGNED_UP_FOR]-(:User {userId: $userId}))
+                 ELSE false END AS userSignedUp
+            
+            RETURN id(g) AS Id,
+                   g.name AS Name,
+                   g.description AS Description,
+                   g.detailedDescription AS DetailedDescription,
+                   g.category AS Category,
+                   g.latitude AS Latitude,
+                   g.longitude AS Longitude,
+                   g.address AS Address,
+                   g.startTime AS StartTime,
+                   g.endTime AS EndTime,
+                   g.estimatedDuration AS EstimatedDuration,
+                   g.effortLevel AS EffortLevel,
+                   g.isAccessible AS IsAccessible,
+                   g.isVirtual AS IsVirtual,
+                   g.maxParticipants AS MaxParticipants,
+                   g.currentParticipants AS CurrentParticipants,
+                   g.minimumAge AS MinimumAge,
+                   g.familyFriendly AS FamilyFriendly,
+                   g.isRecurring AS IsRecurring,
+                   g.recurrencePattern AS RecurrencePattern,
+                   g.organizationName AS OrganizationName,
+                   g.organizationWebsite AS OrganizationWebsite,
+                   g.parkingAvailable AS ParkingAvailable,
+                   g.publicTransitAccessible AS PublicTransitAccessible,
+                   g.specialInstructions AS SpecialInstructions,
+                   g.impactDescription AS ImpactDescription,
+                   g.estimatedPeopleHelped AS EstimatedPeopleHelped,
+                   g.status AS Status,
+                   g.outdoorActivity AS OutdoorActivity,
+                   g.weatherDependent AS WeatherDependent,
+                   g.createdDate AS CreatedDate,
+                   c.name AS ContactName,
+                   c.email AS ContactEmail,
+                   c.phone AS ContactPhone,
+                   cat.name AS CategoryName,
+                   subcat.name AS SubCategory,
+                   l.city AS City,
+                   l.state AS State,
+                   l.country AS Country,
+                   l.zip AS Zip,
+                   tags, skills,
+                   interestedCount, signedUpCount,
+                   userInterested, userSignedUp";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, new { id, userId });
+
+        var record = await result.SingleOrDefaultAsync();
+        if (record == null) return null;
+
+        return MapRecordToGoodWork(record);
     }
 
     public async Task<List<GoodWorksModel>> GetSimilarGoodWorksAsync(long goodWorkId, string? userId = null, int limit = 10)
@@ -472,7 +692,12 @@ public class Neo4jService : IDisposable
             OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
             OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
             OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)
-            RETURN id(g) AS Id, g, c, cat, l
+            OPTIONAL MATCH (g)-[:REQUIRES_SKILL]->(s:Skill)
+            OPTIONAL MATCH (g)<-[signup:SIGNED_UP_FOR]-(u:User)
+            WITH g, c, cat, l,
+                 collect(DISTINCT s.name) AS skills,
+                 count(DISTINCT signup) AS signedUpCount
+            RETURN id(g) AS Id, g, c, cat, l, skills, signedUpCount
             ORDER BY g.createdDate DESC";
 
         using var session = _driver.AsyncSession();
@@ -481,10 +706,102 @@ public class Neo4jService : IDisposable
         var goodWorks = new List<GoodWorksModel>();
         await result.ForEachAsync(record =>
         {
-            goodWorks.Add(MapRecordToGoodWork(record));
+            var goodWork = MapRecordToGoodWork(record);
+
+            if (record.ContainsKey("signedUpCount"))
+            {
+                goodWork.SignedUpCount = record["signedUpCount"].As<int?>() ?? 0;
+            }
+
+            goodWorks.Add(goodWork);
         });
 
         return goodWorks;
+    }
+
+    public async Task<List<GoodWorksModel>> GetUserCreatedGoodWorksPagedAsync(
+        string userId, 
+        int page = 1, 
+        int pageSize = 10, 
+        string? searchText = null)
+    {
+        var conditions = new List<string> { "g.createdBy = $userId" };
+        var parameters = new Dictionary<string, object>
+        {
+            { "userId", userId }
+        };
+
+        // Add search text filtering
+        if (!string.IsNullOrEmpty(searchText))
+        {
+            conditions.Add("(toLower(g.name) CONTAINS toLower($searchText) OR toLower(g.description) CONTAINS toLower($searchText) OR toLower(g.category) CONTAINS toLower($searchText))");
+            parameters["searchText"] = searchText;
+        }
+
+        var whereClause = "WHERE " + string.Join(" AND ", conditions);
+        var skip = (page - 1) * pageSize;
+        parameters["skip"] = skip;
+        parameters["limit"] = pageSize;
+
+        var query = $@"
+            MATCH (g:GoodWork)
+            {whereClause}
+            OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
+            OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
+            OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)
+            OPTIONAL MATCH (g)-[:REQUIRES_SKILL]->(s:Skill)
+            OPTIONAL MATCH (g)<-[signup:SIGNED_UP_FOR]-(u:User)
+            WITH g, c, cat, l,
+                 collect(DISTINCT s.name) AS skills,
+                 count(DISTINCT signup) AS signedUpCount
+            RETURN id(g) AS Id, g, c, cat, l, skills, signedUpCount
+            ORDER BY g.createdDate DESC
+            SKIP $skip
+            LIMIT $limit";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, parameters);
+
+        var goodWorks = new List<GoodWorksModel>();
+        await result.ForEachAsync(record =>
+        {
+            var goodWork = MapRecordToGoodWork(record);
+            if (record.ContainsKey("signedUpCount"))
+            {
+                goodWork.SignedUpCount = record["signedUpCount"].As<int?>() ?? 0;
+            }
+            goodWorks.Add(goodWork);
+        });
+
+        return goodWorks;
+    }
+
+    public async Task<int> CountUserCreatedGoodWorksAsync(string userId, string? searchText = null)
+    {
+        var conditions = new List<string> { "g.createdBy = $userId" };
+        var parameters = new Dictionary<string, object>
+        {
+            { "userId", userId }
+        };
+
+        // Add search text filtering
+        if (!string.IsNullOrEmpty(searchText))
+        {
+            conditions.Add("(toLower(g.name) CONTAINS toLower($searchText) OR toLower(g.description) CONTAINS toLower($searchText) OR toLower(g.category) CONTAINS toLower($searchText))");
+            parameters["searchText"] = searchText;
+        }
+
+        var whereClause = "WHERE " + string.Join(" AND ", conditions);
+
+        var query = $@"
+            MATCH (g:GoodWork)
+            {whereClause}
+            RETURN count(g) AS totalCount";
+
+        using var session = _driver.AsyncSession();
+        var result = await session.RunAsync(query, parameters);
+        var record = await result.SingleAsync();
+        return record["totalCount"].As<int>();
     }
 
     public async Task UpdateGoodWorkAsync(long id, GoodWorksModel goodWork, string userId)

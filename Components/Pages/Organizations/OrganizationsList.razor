@@ -41,10 +41,12 @@
                     Variant="Variant.Outlined"
                     Adornment="Adornment.Start" 
                     AdornmentIcon="@Icons.Material.Filled.Search"
-                    OnKeyUp="HandleSearch"
                     Immediate="true"
-                    DebounceInterval="300"
-                    Class="mb-4" />
+                    DebounceInterval="500"
+                    @bind-Value:after="OnSearchChanged"
+                    Clearable="true"
+                    Class="mb-4"
+                    HelperText="Search by name, description, or city" />
     </MudPaper>
 
     @if (isLoading)
@@ -163,12 +165,20 @@
         <MudPaper Elevation="2" Class="pa-4">
             <MudText Typo="Typo.h5" GutterBottom="true">
                 <MudIcon Icon="@Icons.Material.Filled.BusinessCenter" Class="mr-2" />
-                All Organizations (@organizations.Count)
+                All Organizations (@totalOrganizations)
             </MudText>
             
+            <!-- Results Info -->
+            @if (totalOrganizations > 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    Showing @((currentPage - 1) * pageSize + 1) - @Math.Min(currentPage * pageSize, totalOrganizations) of @totalOrganizations organizations
+                </MudText>
+            }
+            
             <!-- Filter by Type -->
-            <MudChipSet T="string" @bind-SelectedChip="selectedTypeChip" Class="mb-4">
-                <MudChip T="string" Value="@("All")" Color="Color.Primary">All</MudChip>
+            <MudChipSet T="string" SelectedChip="@selectedTypeChip" SelectedChipChanged="OnTypeFilterChanged" Class="mb-4">
+                <MudChip T="string" Value="@("All")" Color="Color.Primary" Default="true">All</MudChip>
                 <MudChip T="string" Value="@("Nonprofit")" Color="Color.Primary">Nonprofit</MudChip>
                 <MudChip T="string" Value="@("Religious")" Color="Color.Primary">Religious</MudChip>
                 <MudChip T="string" Value="@("Educational")" Color="Color.Primary">Educational</MudChip>
@@ -262,6 +272,28 @@
                     No organizations found matching your criteria.
                 </MudAlert>
             }
+            
+            <!-- Pagination Controls -->
+            @if (totalOrganizations > pageSize)
+            {
+                <div class="d-flex justify-space-between align-center mt-4">
+                    <div class="d-flex align-center gap-2">
+                        <MudText Typo="Typo.body2">Items per page:</MudText>
+                        <MudSelect T="int" Value="@pageSize" ValueChanged="OnPageSizeChanged" Dense="true" Variant="Variant.Outlined">
+                            <MudSelectItem Value="6">6</MudSelectItem>
+                            <MudSelectItem Value="12">12</MudSelectItem>
+                            <MudSelectItem Value="24">24</MudSelectItem>
+                            <MudSelectItem Value="48">48</MudSelectItem>
+                        </MudSelect>
+                    </div>
+                    
+                    <MudPagination Count="@((int)Math.Ceiling((double)totalOrganizations / pageSize))" 
+                                   Selected="@currentPage" 
+                                   SelectedChanged="OnPageChanged"
+                                   ShowFirstButton="true"
+                                   ShowLastButton="true" />
+                </div>
+            }
         </MudPaper>
     }
 </MudContainer>
@@ -273,6 +305,12 @@
     private string? userId;
     private string searchTerm = string.Empty;
     private MudChip<string>? selectedTypeChip;
+    
+    // Pagination state
+    private int currentPage = 1;
+    private int pageSize = 12; // 12 cards per page
+    private int totalOrganizations = 0;
+    private int totalFilteredOrganizations = 0; // For client-side filtering count
 
     protected override async Task OnInitializedAsync()
     {
@@ -288,19 +326,48 @@
 
         try
         {
-            // Load all organizations
-            organizations = await _organizationService.GetOrganizationsAsync(0, 100);
+            // Get total count for pagination
+            totalOrganizations = await _organizationService.CountOrganizationsAsync(
+                string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm
+            );
+
+            // Get page data
+            var skip = (currentPage - 1) * pageSize;
+            organizations = await _organizationService.GetOrganizationsAsync(
+                skip, 
+                pageSize,
+                string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm
+            );
 
             // Load user's organizations if authenticated
             if (!string.IsNullOrEmpty(userId))
             {
-                userOrganizations = await _organizationService.GetUserOrganizationsAsync(userId);
+                var allUserOrgs = await _organizationService.GetUserOrganizationsAsync(userId);
+                
+                // Filter user orgs by search term if one is provided
+                if (!string.IsNullOrWhiteSpace(searchTerm))
+                {
+                    var searchLower = searchTerm.ToLower();
+                    userOrganizations = allUserOrgs.Where(o =>
+                        (o.Name?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (o.Description?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                        (o.City?.Contains(searchLower, StringComparison.OrdinalIgnoreCase) ?? false)
+                    ).ToList();
+                }
+                else
+                {
+                    userOrganizations = allUserOrgs;
+                }
             }
+            
+            // Calculate filtered count for display
+            totalFilteredOrganizations = GetFilteredOrganizations().Count();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading organizations: {ex.Message}");
             organizations = new List<OrganizationModel>();
+            totalOrganizations = 0;
         }
         finally
         {
@@ -308,31 +375,29 @@
         }
     }
 
-    private async Task HandleSearch(KeyboardEventArgs e)
+    private async Task OnSearchChanged()
     {
-        await PerformSearch();
+        currentPage = 1; // Reset to first page on search
+        await LoadOrganizations();
     }
 
-    private async Task PerformSearch()
+    private async Task OnTypeFilterChanged(MudChip<string> chip)
     {
-        isLoading = true;
+        selectedTypeChip = chip;
+        StateHasChanged();
+    }
 
-        try
-        {
-            organizations = await _organizationService.GetOrganizationsAsync(
-                0, 
-                100, 
-                string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm
-            );
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error searching organizations: {ex.Message}");
-        }
-        finally
-        {
-            isLoading = false;
-        }
+    private async Task OnPageChanged(int page)
+    {
+        currentPage = page;
+        await LoadOrganizations();
+    }
+
+    private async Task OnPageSizeChanged(int newPageSize)
+    {
+        pageSize = newPageSize;
+        currentPage = 1; // Reset to first page when page size changes
+        await LoadOrganizations();
     }
 
     private IEnumerable<OrganizationModel> GetFilteredOrganizations()
