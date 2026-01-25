@@ -1,0 +1,425 @@
+@page "/admin/graph-explorer"
+@using CharityRabbit.Data
+@using System.Text.Json
+@using Microsoft.AspNetCore.Authorization
+@inject GraphExplorerService _graphService
+@inject IJSRuntime JSRuntime
+@attribute [Authorize]
+
+<PageTitle>Graph Explorer - Charity Rabbit</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="pa-4 mt-4">
+    <MudText Typo="Typo.h3" GutterBottom="true">
+        <MudIcon Icon="@Icons.Material.Filled.AccountTree" Class="mr-2" />
+        Graph Database Explorer
+    </MudText>
+
+    <MudAlert Severity="Severity.Info" Class="mb-4">
+        <strong>Interactive Graph Visualization:</strong> Explore your Neo4j database structure. 
+        Click nodes to see details, double-click to expand neighbors, use filters to focus on specific data.
+    </MudAlert>
+
+    <MudGrid>
+        <!-- Control Panel -->
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="4" Class="pa-3" Style="position: sticky; top: 20px;">
+                <MudText Typo="Typo.h6" GutterBottom="true">Controls</MudText>
+
+                <!-- Statistics -->
+                @if (stats != null)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mt-3 mb-2">Database Stats</MudText>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.Circle">
+                        @stats.TotalNodes nodes
+                    </MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Icon="@Icons.Material.Filled.ArrowForward">
+                        @stats.TotalRelationships edges
+                    </MudChip>
+                }
+
+                <MudDivider Class="my-3" />
+
+                <!-- Filters -->
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Filters</MudText>
+
+                <MudSelect @bind-Value="selectedNodeType" Label="Node Type" Variant="Variant.Outlined" Dense="true" Class="mb-2">
+                    <MudSelectItem Value="@((string?)null)">All Types</MudSelectItem>
+                    @if (stats?.NodeCounts != null)
+                    {
+                        @foreach (var nodeType in stats.NodeCounts.Keys.OrderBy(k => k))
+                        {
+                            <MudSelectItem Value="@nodeType">@nodeType (@stats.NodeCounts[nodeType])</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+
+                <MudSelect @bind-Value="selectedRelType" Label="Relationship Type" Variant="Variant.Outlined" Dense="true" Class="mb-2">
+                    <MudSelectItem Value="@((string?)null)">All Types</MudSelectItem>
+                    @if (stats?.RelationshipCounts != null)
+                    {
+                        @foreach (var relType in stats.RelationshipCounts.Keys.OrderBy(k => k))
+                        {
+                            <MudSelectItem Value="@relType">@relType (@stats.RelationshipCounts[relType])</MudSelectItem>
+                        }
+                    }
+                </MudSelect>
+
+                <MudNumericField @bind-Value="sampleLimit" Label="Max Nodes" Variant="Variant.Outlined" Dense="true" Min="10" Max="200" Class="mb-2" />
+
+                <MudButton Variant="Variant.Filled" 
+                         Color="Color.Primary" 
+                         StartIcon="@Icons.Material.Filled.Refresh"
+                         OnClick="LoadGraphSample"
+                         Disabled="@isLoading"
+                         FullWidth="true"
+                         Class="mb-2">
+                    @if (isLoading)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <span>Loading...</span>
+                    }
+                    else
+                    {
+                        <span>Load Graph</span>
+                    }
+                </MudButton>
+
+                <MudDivider Class="my-3" />
+
+                <!-- Search -->
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Search Nodes</MudText>
+
+                <MudTextField @bind-Value="searchText" 
+                            Label="Search" 
+                            Variant="Variant.Outlined" 
+                            Dense="true"
+                            Immediate="true"
+                            Clearable="true"
+                            Class="mb-2"
+                            Adornment="Adornment.Start"
+                            AdornmentIcon="@Icons.Material.Filled.Search" />
+
+                <MudButton Variant="Variant.Outlined" 
+                         Color="Color.Primary" 
+                         StartIcon="@Icons.Material.Filled.Search"
+                         OnClick="SearchNodes"
+                         Disabled="@isLoading"
+                         FullWidth="true"
+                         Class="mb-2">
+                    Search
+                </MudButton>
+
+                @if (searchResults?.Any() == true)
+                {
+                    <MudList T="GraphNode" Dense="true" Class="mt-2">
+                        @foreach (var node in searchResults.Take(10))
+                        {
+                            <MudListItem OnClick="@(() => FocusNode(node.Id))">
+                                <div>
+                                    <MudText Typo="Typo.body2"><strong>@node.Title</strong></MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@node.Type</MudText>
+                                </div>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+
+                <MudDivider Class="my-3" />
+
+                <!-- Legend -->
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Node Types</MudText>
+                <div class="d-flex flex-column gap-1">
+                    <MudChip T="string" Size="Size.Small" Style="background-color: #FF6B6B; color: white;">GoodWork</MudChip>
+                    <MudChip T="string" Size="Size.Small" Style="background-color: #4ECDC4; color: white;">Organization</MudChip>
+                    <MudChip T="string" Size="Size.Small" Style="background-color: #45B7D1; color: white;">User</MudChip>
+                    <MudChip T="string" Size="Size.Small" Style="background-color: #FFA07A; color: white;">Category</MudChip>
+                    <MudChip T="string" Size="Size.Small" Style="background-color: #98D8C8; color: white;">Location</MudChip>
+                    <MudChip T="string" Size="Size.Small" Style="background-color: #F7DC6F; color: white;">Contact</MudChip>
+                    <MudChip T="string" Size="Size.Small" Style="background-color: #BB8FCE; color: white;">Skill</MudChip>
+                    <MudChip T="string" Size="Size.Small" Style="background-color: #85C1E2; color: white;">Tag</MudChip>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Graph Visualization -->
+        <MudItem xs="12" md="6">
+            <MudPaper Elevation="4" Class="pa-0" Style="height: 700px; position: relative;">
+                <div id="graph-container" style="width: 100%; height: 100%;"></div>
+                
+                @if (isLoading)
+                {
+                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                        <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+                    </div>
+                }
+            </MudPaper>
+
+            <!-- Graph Info -->
+            <MudPaper Elevation="2" Class="pa-3 mt-2">
+                <MudText Typo="Typo.body2">
+                    <strong>Interactions:</strong> Click node for details • Double-click to expand neighbors • Drag to pan • Scroll to zoom
+                </MudText>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Details Panel -->
+        <MudItem xs="12" md="3">
+            <MudPaper Elevation="4" Class="pa-3" Style="position: sticky; top: 20px; max-height: 700px; overflow-y: auto;">
+                <MudText Typo="Typo.h6" GutterBottom="true">Details</MudText>
+
+                @if (selectedNode != null)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                        <strong>@selectedNode.Type</strong> Node
+                    </MudAlert>
+
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">@selectedNode.Title</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">ID: @selectedNode.Id</MudText>
+
+                    <MudButton Variant="Variant.Outlined" 
+                             Color="Color.Primary" 
+                             Size="Size.Small"
+                             StartIcon="@Icons.Material.Filled.Expand"
+                             OnClick="@(() => ExpandNode(selectedNode.Id))"
+                             FullWidth="true"
+                             Class="mb-3">
+                        Expand Neighbors
+                    </MudButton>
+
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Properties</MudText>
+                    @if (selectedNode.Properties?.Any() == true)
+                    {
+                        <MudSimpleTable Dense="true" Hover="true" Class="mb-3">
+                            <tbody>
+                                @foreach (var prop in selectedNode.Properties.OrderBy(p => p.Key))
+                                {
+                                    <tr>
+                                        <td style="width: 40%; font-weight: 500;">@prop.Key</td>
+                                        <td style="width: 60%; word-break: break-word;">
+                                            @if (prop.Value != null)
+                                            {
+                                                var valueStr = prop.Value.ToString();
+                                                if (valueStr?.Length > 100)
+                                                {
+                                                    <span>@valueStr.Substring(0, 100)...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>@valueStr</span>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="mud-text-secondary">null</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">No properties</MudText>
+                    }
+                }
+                else if (selectedEdge != null)
+                {
+                    <MudAlert Severity="Severity.Normal" Dense="true" Class="mb-3">
+                        <strong>@selectedEdge.Type</strong> Relationship
+                    </MudAlert>
+
+                    <MudText Typo="Typo.subtitle1" Class="mb-2">@selectedEdge.Label</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-3">ID: @selectedEdge.Id</MudText>
+
+                    <MudText Typo="Typo.body2" Class="mb-1">
+                        <strong>From:</strong> @selectedEdge.From
+                    </MudText>
+                    <MudText Typo="Typo.body2" Class="mb-3">
+                        <strong>To:</strong> @selectedEdge.To
+                    </MudText>
+
+                    @if (selectedEdge.Properties?.Any() == true)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mb-2">Properties</MudText>
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <tbody>
+                                @foreach (var prop in selectedEdge.Properties.OrderBy(p => p.Key))
+                                {
+                                    <tr>
+                                        <td style="width: 40%; font-weight: 500;">@prop.Key</td>
+                                        <td style="width: 60%; word-break: break-word;">@prop.Value?.ToString()</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Normal" Class="mt-3">
+                        Click on a node or edge to see details
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudButton Variant="Variant.Text" 
+               StartIcon="@Icons.Material.Filled.ArrowBack" 
+               Color="Color.Default" 
+               Class="mt-4"
+               Href="/profile">
+        Back to Profile
+    </MudButton>
+</MudContainer>
+
+@code {
+    private GraphStats? stats;
+    private GraphData? currentGraph;
+    private List<GraphNode>? searchResults;
+    private GraphNode? selectedNode;
+    private GraphEdge? selectedEdge;
+
+    private bool isLoading = false;
+    private string? selectedNodeType;
+    private string? selectedRelType;
+    private int sampleLimit = 50;
+    private string searchText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStats();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("initializeGraph");
+            // Don't auto-load on first render, let user click Load Graph
+        }
+    }
+
+    private async Task LoadStats()
+    {
+        try
+        {
+            stats = await _graphService.GetGraphStatsAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading stats: {ex.Message}");
+        }
+    }
+
+    private async Task LoadGraphSample()
+    {
+        isLoading = true;
+        selectedNode = null;
+        selectedEdge = null;
+        StateHasChanged();
+
+        try
+        {
+            Console.WriteLine($"Loading graph with filters - NodeType: {selectedNodeType ?? "All"}, RelType: {selectedRelType ?? "All"}, Limit: {sampleLimit}");
+            
+            currentGraph = await _graphService.GetGraphSampleAsync(sampleLimit, selectedNodeType, selectedRelType);
+            
+            Console.WriteLine($"Loaded {currentGraph.Nodes.Count} nodes and {currentGraph.Edges.Count} edges");
+            
+            if (currentGraph.Nodes.Count == 0)
+            {
+                Console.WriteLine("Warning: No nodes returned from query");
+            }
+            
+            await RenderGraph(currentGraph);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading graph: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SearchNodes()
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+            return;
+
+        try
+        {
+            searchResults = await _graphService.SearchNodesAsync(selectedNodeType, searchText, 20);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error searching: {ex.Message}");
+        }
+    }
+
+    private async Task FocusNode(string nodeId)
+    {
+        await JSRuntime.InvokeVoidAsync("focusNode", nodeId);
+        await SelectNode(nodeId);
+    }
+
+    private async Task ExpandNode(string nodeId)
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var neighbors = await _graphService.GetNodeNeighborsAsync(nodeId, 1);
+            await JSRuntime.InvokeVoidAsync("addGraphData", 
+                JsonSerializer.Serialize(neighbors.Nodes),
+                JsonSerializer.Serialize(neighbors.Edges));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error expanding node: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RenderGraph(GraphData graph)
+    {
+        var nodesJson = JsonSerializer.Serialize(graph.Nodes);
+        var edgesJson = JsonSerializer.Serialize(graph.Edges);
+        
+        await JSRuntime.InvokeVoidAsync("renderGraph", nodesJson, edgesJson, 
+            DotNetObjectReference.Create(this));
+    }
+
+    [JSInvokable]
+    public async Task SelectNode(string nodeId)
+    {
+        selectedEdge = null;
+        selectedNode = await _graphService.GetNodeDetailsAsync(nodeId);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task SelectEdge(string edgeId)
+    {
+        selectedNode = null;
+        selectedEdge = await _graphService.GetRelationshipDetailsAsync(edgeId);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task DoubleClickNode(string nodeId)
+    {
+        await ExpandNode(nodeId);
+    }
+}

@@ -51,6 +51,7 @@ internal class Program
         builder.Services.AddScoped<SeoService>();
         builder.Services.AddScoped<OrganizationService>();
         builder.Services.AddScoped<SkillService>();
+        builder.Services.AddScoped<GraphExplorerService>();
 
         var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"] ?? throw new InvalidOperationException("GoogleMaps API key is missing in configuration.");
 

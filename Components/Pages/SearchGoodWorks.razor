@@ -273,6 +273,193 @@
                     </MudItem>
                 </MudGrid>
             </MudTabPanel>
+
+            <!-- Calendar View Tab -->
+            <MudTabPanel Text="Calendar View" Icon="@Icons.Material.Filled.CalendarMonth">
+                <MudGrid>
+                    <!-- Calendar Filters -->
+                    <MudItem xs="12" md="3">
+                        <MudPaper Elevation="2" Class="pa-3">
+                            <MudText Typo="Typo.h6" GutterBottom="true">Filters</MudText>
+                            
+                            <MudSelect @bind-Value="searchCriteria.Category" Label="Category" Clearable="true" Class="mb-3">
+                                <MudSelectItem Value="@((string?)null)">All Categories</MudSelectItem>
+                                @foreach (var category in categories)
+                                {
+                                    <MudSelectItem Value="@category">@category</MudSelectItem>
+                                }
+                            </MudSelect>
+
+                            <MudCheckBox @bind-Value="searchCriteria.IsVirtual" Label="Virtual Only" Class="mb-2" />
+                            <MudCheckBox @bind-Value="searchCriteria.IsAccessible" Label="Wheelchair Accessible" Class="mb-2" />
+                            <MudCheckBox @bind-Value="searchCriteria.FamilyFriendly" Label="Family Friendly" Class="mb-2" />
+                            <MudCheckBox @bind-Value="availableSpotsOnly" Label="Available Spots Only" Class="mb-3" />
+
+                            <MudButton Variant="Variant.Filled" 
+                                     Color="Color.Primary" 
+                                     FullWidth="true"
+                                     StartIcon="@Icons.Material.Filled.Search"
+                                     OnClick="PerformSearch"
+                                     Class="mb-2">
+                                Search
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" 
+                                     Color="Color.Secondary" 
+                                     FullWidth="true"
+                                     OnClick="ClearFilters">
+                                Clear Filters
+                            </MudButton>
+
+                            @if (searchResults != null && calendarEvents.Any())
+                            {
+                                <MudDivider Class="my-3" />
+                                <MudText Typo="Typo.body2" Color="Color.Info">
+                                    <MudIcon Icon="@Icons.Material.Filled.Event" Size="MudBlazor.Size.Small" /> 
+                                    @calendarEvents.Count events this month
+                                </MudText>
+                                
+                                <MudDivider Class="my-3" />
+                                <MudText Typo="Typo.subtitle2" GutterBottom="true">Legend</MudText>
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
+                                    @foreach (var category in categories)
+                                    {
+                                        var color = categoryColors[category];
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <div style="width: 20px; height: 20px; background-color: @color; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1);"></div>
+                                            <MudText Typo="Typo.body2">@category</MudText>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </MudPaper>
+                    </MudItem>
+
+                    <!-- Calendar Display -->
+                    <MudItem xs="12" md="9">
+                        @if (isLoading)
+                        {
+                            <div class="d-flex justify-center align-center" style="min-height: 600px;">
+                                <MudProgressCircular Indeterminate="true" Size="MudBlazor.Size.Large" />
+                                <MudText Typo="Typo.h6" Class="ml-3">Loading calendar...</MudText>
+                            </div>
+                        }
+                        else
+                        {
+                            <MudPaper Elevation="2" Class="pa-3">
+                                <!-- Calendar Header -->
+                                <div class="d-flex justify-space-between align-center mb-3">
+                                    <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" 
+                                                 OnClick="@(() => ChangeMonth(-1))" 
+                                                 Color="Color.Primary" />
+                                    <MudText Typo="Typo.h5">@currentCalendarMonth.ToString("MMMM yyyy")</MudText>
+                                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" 
+                                                 OnClick="@(() => ChangeMonth(1))" 
+                                                 Color="Color.Primary" />
+                                </div>
+
+                                <!-- Calendar Grid -->
+                                <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;">
+                                    <!-- Day Headers -->
+                                    @foreach (var day in new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" })
+                                    {
+                                        <div style="text-align: center; padding: 8px; font-weight: bold; background-color: #f5f5f5; border-radius: 4px;">
+                                            @day
+                                        </div>
+                                    }
+
+                                    <!-- Calendar Days -->
+                                    @foreach (var day in GetCalendarDays())
+                                    {
+                                        var dayEvents = GetEventsForDay(day);
+                                        var isCurrentMonth = day.Month == currentCalendarMonth.Month;
+                                        var isToday = day.Date == DateTime.Today;
+                                        
+                                        <div style="@GetDayStyle(isCurrentMonth, isToday)" @onclick="@(() => SelectDay(day))">
+                                            <div style="font-weight: @(isToday ? "bold" : "normal"); color: @(isCurrentMonth ? "#424242" : "#9E9E9E"); margin-bottom: 4px;">
+                                                @day.Day
+                                            </div>
+                                            @if (dayEvents.Any())
+                                            {
+                                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                                    @foreach (var evt in dayEvents.Take(3))
+                                                    {
+                                                        var color = categoryColors.ContainsKey(evt.Category ?? "") ? categoryColors[evt.Category ?? ""] : "#1976d2";
+                                                        <div style="@GetEventBadgeStyle(color)" 
+                                                             title="@evt.Name">
+                                                            <span style="font-size: 10px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                                @evt.StartTime?.ToString("h:mm tt") - @(evt.Name.Length > 15 ? evt.Name.Substring(0, 15) + "..." : evt.Name)
+                                                            </span>
+                                                        </div>
+                                                    }
+                                                    @if (dayEvents.Count > 3)
+                                                    {
+                                                        <div style="font-size: 10px; color: #666; text-align: center; padding: 2px;">
+                                                            +@(dayEvents.Count - 3) more
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Selected Day Events -->
+                                @if (selectedDate.HasValue)
+                                {
+                                    var selectedDayEvents = GetEventsForDay(selectedDate.Value);
+                                    <MudDivider Class="my-4" />
+                                    <MudText Typo="Typo.h6" GutterBottom="true">
+                                        Events on @selectedDate.Value.ToString("MMMM dd, yyyy")
+                                    </MudText>
+                                    
+                                    @if (selectedDayEvents.Any())
+                                    {
+                                        <MudList T="GoodWorksModel" Dense="true">
+                                            @foreach (var evt in selectedDayEvents.OrderBy(e => e.StartTime))
+                                            {
+                                                var color = categoryColors.ContainsKey(evt.Category ?? "") ? categoryColors[evt.Category ?? ""] : "#1976d2";
+                                                <MudListItem>
+                                                    <div class="d-flex align-center gap-2">
+                                                        <div style="width: 4px; height: 40px; background-color: @color; border-radius: 2px;"></div>
+                                                        <div style="flex: 1;">
+                                                            <MudLink Href="@($"/goodwork/{evt.Id}")" Typo="Typo.body1">
+                                                                <strong>@evt.Name</strong>
+                                                            </MudLink>
+                                                            <div class="d-flex gap-2 align-center mt-1">
+                                                                <MudChip T="string" Size="MudBlazor.Size.Small" Style="@($"background-color: {color}; color: white;")">
+                                                                    @evt.Category
+                                                                </MudChip>
+                                                                <MudText Typo="Typo.caption">
+                                                                    @evt.StartTime?.ToString("h:mm tt") - @evt.EndTime?.ToString("h:mm tt")
+                                                                </MudText>
+                                                            </div>
+                                                            @if (!string.IsNullOrEmpty(evt.Address))
+                                                            {
+                                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                                    <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="MudBlazor.Size.Small" /> @evt.Address
+                                                                </MudText>
+                                                            }
+                                                        </div>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                                                     Color="Color.Primary" 
+                                                                     Size="MudBlazor.Size.Small"
+                                                                     Href="@($"/goodwork/{evt.Id}")" />
+                                                    </div>
+                                                </MudListItem>
+                                                <MudDivider />
+                                            }
+                                        </MudList>
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Info">No events scheduled for this day</MudAlert>
+                                    }
+                                }
+                            </MudPaper>
+                        }
+                    </MudItem>
+                </MudGrid>
+            </MudTabPanel>
         </MudTabs>
     </MudPaper>
 </MudContainer>
@@ -292,6 +479,16 @@
     private List<string> selectedSkills = new();
     private string? selectedSkillFilter;
 
+    // Map fields
+    private GoogleMap? _map;
+    private MapOptions _mapOptions = new();
+    private List<Marker> _markers = new();
+
+    // Calendar fields
+    private DateTime currentCalendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime? selectedDate;
+    private List<GoodWorksModel> calendarEvents = new();
+
     private readonly List<string> categories = new()
     {
         "Food Bank",
@@ -305,11 +502,6 @@
         "Senior Care",
         "Disaster Relief"
     };
-
-    // Map fields
-    private GoogleMap? _map;
-    private MapOptions _mapOptions = new();
-    private List<Marker> _markers = new();
 
     // Category icon mapping
     private readonly Dictionary<string, string> categoryIcons = new()
@@ -413,6 +605,9 @@
             }
             
             filteredResults = searchResults;
+            
+            // Initialize calendar events
+            UpdateCalendarEvents();
         }
         catch (Exception ex)
         {
@@ -434,10 +629,88 @@
         searchResults = await _neo4jService.SearchGoodWorksAsync(searchCriteria);
         filteredResults = searchResults;
         
+        // Update calendar events
+        UpdateCalendarEvents();
+        
         // Update map markers
         await UpdateMapMarkers();
         
         isLoading = false;
+    }
+
+    private void UpdateCalendarEvents()
+    {
+        if (searchResults == null)
+        {
+            calendarEvents = new();
+            return;
+        }
+
+        // Filter events for the current calendar month
+        var monthStart = new DateTime(currentCalendarMonth.Year, currentCalendarMonth.Month, 1);
+        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+        calendarEvents = searchResults
+            .Where(e => e.StartTime.HasValue && 
+                       e.StartTime.Value.Date >= monthStart && 
+                       e.StartTime.Value.Date <= monthEnd)
+            .ToList();
+    }
+
+    private void ChangeMonth(int months)
+    {
+        currentCalendarMonth = currentCalendarMonth.AddMonths(months);
+        UpdateCalendarEvents();
+        selectedDate = null; // Clear selection when changing months
+    }
+
+    private List<DateTime> GetCalendarDays()
+    {
+        var days = new List<DateTime>();
+        var firstDay = new DateTime(currentCalendarMonth.Year, currentCalendarMonth.Month, 1);
+        var lastDay = firstDay.AddMonths(1).AddDays(-1);
+
+        // Get the first Sunday before or on the first day of the month
+        var startDate = firstDay.AddDays(-(int)firstDay.DayOfWeek);
+
+        // Get the last Saturday after or on the last day of the month
+        var endDate = lastDay.AddDays(6 - (int)lastDay.DayOfWeek);
+
+        for (var date = startDate; date <= endDate; date = date.AddDays(1))
+        {
+            days.Add(date);
+        }
+
+        return days;
+    }
+
+    private List<GoodWorksModel> GetEventsForDay(DateTime day)
+    {
+        if (searchResults == null) return new List<GoodWorksModel>();
+
+        return searchResults
+            .Where(e => e.StartTime.HasValue && e.StartTime.Value.Date == day.Date)
+            .OrderBy(e => e.StartTime)
+            .ToList();
+    }
+
+    private void SelectDay(DateTime day)
+    {
+        selectedDate = day;
+    }
+
+    private string GetDayStyle(bool isCurrentMonth, bool isToday)
+    {
+        var bgColor = isToday ? "#E3F2FD" : "white";
+        var borderColor = isToday ? "#1976D2" : "#E0E0E0";
+        var opacity = isCurrentMonth ? "1" : "0.5";
+        
+        return $"min-height: 100px; padding: 8px; border: 2px solid {borderColor}; border-radius: 4px; background-color: {bgColor}; opacity: {opacity}; cursor: pointer; transition: all 0.2s;";
+    }
+
+    private string GetEventBadgeStyle(string color)
+    {
+        return $"background-color: {color}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; cursor: pointer; transition: opacity 0.2s;";
     }
 
     private void OnGridSearch(string searchText)
@@ -476,6 +749,11 @@
         
         // Clear map markers
         ClearMarkers();
+        
+        // Reset calendar
+        currentCalendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+        selectedDate = null;
+        calendarEvents = new();
     }
 
     private async Task<IEnumerable<string>> SearchSkills(string value, CancellationToken token)
@@ -494,7 +772,7 @@
         if (!string.IsNullOrWhiteSpace(selectedSkillFilter))
         {
             AddSkillFilter(selectedSkillFilter);
-            selectedSkillFilter = null; // Clear the field after adding
+            selectedSkillFilter = null;
         }
     }
 
@@ -526,33 +804,23 @@
     {
         if (_map == null || _map.InteropObject == null || searchResults == null) 
         {
-            // Map not initialized yet or no results to display
             return;
         }
 
-        // Clear existing markers
         ClearMarkers();
 
-        // Add new markers
         foreach (var goodWork in searchResults)
         {
             if (goodWork.Latitude == 0 && goodWork.Longitude == 0) continue;
 
             try
             {
-                // Get category-specific icon and color
-                var icon = categoryIcons.ContainsKey(goodWork.Category ?? "") 
-                    ? categoryIcons[goodWork.Category ?? ""] 
-                    : "??";
-                
                 var color = categoryColors.ContainsKey(goodWork.Category ?? "") 
                     ? categoryColors[goodWork.Category ?? ""] 
                     : "#1976d2";
 
-                // Use first letter of category instead of emoji for SVG compatibility
                 var categoryLetter = !string.IsNullOrEmpty(goodWork.Category) ? goodWork.Category.Substring(0, 1).ToUpper() : "?";                
 
-                // Create custom SVG marker icon with category color and letter
                 var svgMarker = $@"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='38' height='50' viewBox='0 0 38 50'%3E%3Cpath fill='{Uri.EscapeDataString(color)}' stroke='%23FFFFFF' stroke-width='2' d='M19 0C8.5 0 0 8.5 0 19c0 14 19 31 19 31s19-17 19-31c0-10.5-8.5-19-19-19z'/%3E%3Ccircle cx='19' cy='19' r='12' fill='white' opacity='0.9'/%3E%3Ctext x='19' y='25' text-anchor='middle' font-size='18' font-weight='bold' fill='{Uri.EscapeDataString(color)}' font-family='Arial, sans-serif'%3E{categoryLetter}%3C/text%3E%3C/svg%3E";
 
                 var marker = await Marker.CreateAsync(_map.JsRuntime, new MarkerOptions
@@ -569,7 +837,7 @@
                     Clickable = true
                 });
 
-                var goodWorkForClosure = goodWork; // Capture for closure
+                var goodWorkForClosure = goodWork;
                 await marker.AddListener<MouseEvent>("click", async (e) =>
                 {
                     var startTime = goodWorkForClosure.StartTime?.ToString("MMM dd, yyyy h:mm tt") ?? "Not specified";
@@ -647,7 +915,6 @@
             }
         }
 
-        // Center map on results
         if (searchResults.Any())
         {
             try
