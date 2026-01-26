@@ -151,7 +151,7 @@ internal class Program
 
         app.MapGroup("/authentication").MapLoginAndLogout();
 
-        // Initialize predefined skills on startup
+        // Initialize predefined skills and database indexes on startup
         using (var scope = app.Services.CreateScope())
         {
             try
@@ -159,10 +159,14 @@ internal class Program
                 var skillService = scope.ServiceProvider.GetRequiredService<SkillService>();
                 await skillService.InitializePredefinedSkillsAsync();
                 Console.WriteLine("Predefined skills initialized successfully");
+
+                var neo4jService = scope.ServiceProvider.GetRequiredService<Neo4jService>();
+                await neo4jService.InitializeDatabaseAsync();
+                Console.WriteLine("Database indexes initialized successfully");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Warning: Could not initialize skills: {ex.Message}");
+                Console.WriteLine($"Warning: Could not initialize database resources: {ex.Message}");
             }
         }
 

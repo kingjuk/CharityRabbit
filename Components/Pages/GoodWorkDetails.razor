@@ -2,6 +2,8 @@
 @using CharityRabbit.Models
 @using CharityRabbit.Data
 @using System.Security.Claims
+@using GoogleMapsComponents
+@using GoogleMapsComponents.Maps
 @inject Neo4jService _neo4jService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -205,9 +207,31 @@ else
                         @if (!string.IsNullOrEmpty(goodWork.Address))
                         {
                             <MudText Typo="Typo.body1" Class="mb-2">@goodWork.Address</MudText>
+                            
+                            @if (goodWork.Latitude != 0 && goodWork.Longitude != 0)
+                            {
+                                <div style="height: 250px; width: 100%; border-radius: 8px; overflow: hidden; margin: 12px 0;">
+                                    <GoogleMap @ref="_locationMap" 
+                                             Id="locationMap" 
+                                             Options="@_locationMapOptions" 
+                                             Height="100%" 
+                                             OnAfterInit="InitializeLocationMap">
+                                    </GoogleMap>
+                                </div>
+                                
+                                <MudButton Variant="Variant.Text" 
+                                         Color="Color.Primary" 
+                                         StartIcon="@Icons.Material.Filled.Directions"
+                                         Href="@GetDirectionsUrl()"
+                                         Target="_blank"
+                                         Size="MudBlazor.Size.Small"
+                                         Class="mt-2">
+                                    Get Directions
+                                </MudButton>
+                            }
                         }
                         
-                        <MudGrid>
+                        <MudGrid Class="mt-3">
                             @if (goodWork.ParkingAvailable)
                             {
                                 <MudItem xs="6">
@@ -339,7 +363,7 @@ else
                         <div class="d-flex flex-wrap gap-2">
                             @foreach (var tag in goodWork.Tags)
                             {
-                                <MudChip T="string" Size="Size.Small">@tag</MudChip>
+                                <MudChip T="string" Size="MudBlazor.Size.Small">@tag</MudChip>
                             }
                         </div>
                     </MudPaper>
@@ -424,6 +448,11 @@ else
     private string? userId;
     private string? userName;
     private string? userEmail;
+    
+    // Map fields
+    private GoogleMap? _locationMap;
+    private MapOptions _locationMapOptions = new();
+    private Marker? _locationMarker;
 
     protected override async Task OnInitializedAsync()
     {
@@ -447,6 +476,22 @@ else
 
         await LoadGoodWork();
         await LoadSimilarGoodWorks();
+        
+        // Initialize map options
+        if (goodWork != null && goodWork.Latitude != 0 && goodWork.Longitude != 0)
+        {
+            _locationMapOptions = new MapOptions
+            {
+                Zoom = 14,
+                Center = new LatLngLiteral(goodWork.Latitude, goodWork.Longitude),
+                MapTypeId = MapTypeId.Roadmap,
+                DisableDefaultUI = false,
+                ZoomControl = true,
+                MapTypeControl = false,
+                StreetViewControl = false,
+                FullscreenControl = true
+            };
+        }
     }
 
     private async Task LoadGoodWork()
@@ -507,5 +552,35 @@ else
         {
             return $"{duration.Minutes}m";
         }
+    }
+
+    private async Task InitializeLocationMap()
+    {
+        if (_locationMap?.InteropObject == null || goodWork == null) return;
+
+        try
+        {
+            var position = new LatLngLiteral(goodWork.Latitude, goodWork.Longitude);
+
+            _locationMarker = await Marker.CreateAsync(_locationMap.JsRuntime, new MarkerOptions
+            {
+                Position = position,
+                Map = _locationMap.InteropObject,
+                Title = goodWork.Name,
+                Clickable = false
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing location map: {ex.Message}");
+        }
+    }
+
+    private string GetDirectionsUrl()
+    {
+        if (goodWork == null) return "#";
+        
+        // Google Maps directions URL
+        return $"https://www.google.com/maps/dir/?api=1&destination={goodWork.Latitude},{goodWork.Longitude}";
     }
 }

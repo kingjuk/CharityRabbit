@@ -316,10 +316,40 @@ public class GraphExplorerService
         var props = node.Properties.ToDictionary(p => p.Key, p => p.Value);
 
         // Try to get a display title from common properties
-        var title = props.ContainsKey("name") ? props["name"]?.ToString() 
-            : props.ContainsKey("title") ? props["title"]?.ToString()
-            : props.ContainsKey("email") ? props["email"]?.ToString()
-            : $"{labels.FirstOrDefault() ?? "Node"} {node.Id}";
+        string? title = null;
+
+        if (labels.Contains("Location"))
+        {
+            var parts = new List<string>();
+            
+            if (props.TryGetValue("city", out var cityObj) && cityObj != null)
+                parts.Add(cityObj.ToString() ?? "");
+                
+            if (props.TryGetValue("state", out var stateObj) && stateObj != null)
+                parts.Add(stateObj.ToString() ?? "");
+
+            if (parts.Any(p => !string.IsNullOrEmpty(p)))
+            {
+                title = string.Join(", ", parts.Where(p => !string.IsNullOrEmpty(p)));
+                
+                if (props.TryGetValue("zip", out var zipObj) && zipObj != null && !string.IsNullOrEmpty(zipObj.ToString()))
+                {
+                    title += $" ({zipObj})";
+                }
+            }
+            else if (props.TryGetValue("zip", out var zipOnly) && zipOnly != null)
+            {
+                title = zipOnly.ToString();
+            }
+        }
+
+        if (string.IsNullOrEmpty(title))
+        {
+            title = props.ContainsKey("name") ? props["name"]?.ToString() 
+                : props.ContainsKey("title") ? props["title"]?.ToString()
+                : props.ContainsKey("email") ? props["email"]?.ToString()
+                : $"{labels.FirstOrDefault() ?? "Node"} {node.Id}";
+        }
 
         return new GraphNode
         {

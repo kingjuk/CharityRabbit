@@ -39,13 +39,13 @@
                 <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" Class="mb-2" />
                 <MudText Typo="Typo.h4">@(signedUpGoodWorks?.Count ?? 0)</MudText>
                 <MudText Typo="Typo.body1">Events Signed Up</MudText>
-                <MudText Typo="Typo.caption">?? @((signedUpGoodWorks?.Count ?? 0) * 3) carrots</MudText>
+                <MudText Typo="Typo.caption">~ @((signedUpGoodWorks?.Count ?? 0) * 3) carrots</MudText>
             </MudItem>
             <MudItem xs="12" sm="4" Class="text-center">
                 <MudIcon Icon="@Icons.Material.Filled.Create" Size="Size.Large" Class="mb-2" />
                 <MudText Typo="Typo.h4">@totalCreatedWorks</MudText>
                 <MudText Typo="Typo.body1">Events Created</MudText>
-                <MudText Typo="Typo.caption">?? @(totalCreatedWorks * 5) carrots</MudText>
+                <MudText Typo="Typo.caption">~ @(totalCreatedWorks * 5) carrots</MudText>
             </MudItem>
         </MudGrid>
     </MudPaper>
@@ -109,18 +109,21 @@
                                     <MudText Typo="Typo.body2" Class="mt-2">@context.Item.Description</MudText>
                                     @if (context.Item.StartTime.HasValue)
                                     {
-                                        <MudText Typo="Typo.caption" Class="mt-1">
-                                            ?? @context.Item.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                        <MudText Typo="Typo.caption" Class="mt-1 d-flex align-center">
+                                            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
+                                            @context.Item.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
                                         </MudText>
                                     }
                                     @if (context.Item.IsRecurring && !string.IsNullOrEmpty(context.Item.RecurrencePattern))
                                     {
-                                        <MudText Typo="Typo.caption" Color="Color.Info">
-                                            ?? @_recurringEventService.FormatRecurrencePattern(context.Item.RecurrencePattern)
+                                        <MudText Typo="Typo.caption" Color="Color.Info" Class="d-flex align-center">
+                                            <MudIcon Icon="@Icons.Material.Filled.Loop" Size="Size.Small" Class="mr-1" />
+                                            @_recurringEventService.FormatRecurrencePattern(context.Item.RecurrencePattern)
                                         </MudText>
                                     }
-                                    <MudText Typo="Typo.caption">
-                                        ?? @context.Item.SignedUpCount participants signed up
+                                    <MudText Typo="Typo.caption" Class="d-flex align-center">
+                                        <MudIcon Icon="@Icons.Material.Filled.Group" Size="Size.Small" Class="mr-1" />
+                                        @context.Item.SignedUpCount participants signed up
                                     </MudText>
                                 </div>
                             </CellTemplate>
@@ -271,14 +274,16 @@
                                     <MudText Typo="Typo.body2" Class="mt-2">@work.Description</MudText>
                                     @if (work.StartTime.HasValue)
                                     {
-                                        <MudText Typo="Typo.caption" Class="mt-2">
-                                            ?? @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                        <MudText Typo="Typo.caption" Class="mt-2 d-flex align-center">
+                                            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
+                                            @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
                                         </MudText>
                                     }
                                     @if (!string.IsNullOrEmpty(work.Address))
                                     {
-                                        <MudText Typo="Typo.caption">
-                                            ?? @work.Address
+                                        <MudText Typo="Typo.caption" Class="d-flex align-center">
+                                            <MudIcon Icon="@Icons.Material.Filled.Place" Size="Size.Small" Class="mr-1" />
+                                            @work.Address
                                         </MudText>
                                     }
                                 </MudCardContent>
@@ -322,8 +327,9 @@
                                     <MudText Typo="Typo.body2" Class="mt-2">@work.Description</MudText>
                                     @if (work.StartTime.HasValue)
                                     {
-                                        <MudText Typo="Typo.caption" Class="mt-2">
-                                            ?? @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
+                                        <MudText Typo="Typo.caption" Class="mt-2 d-flex align-center">
+                                            <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
+                                            @work.StartTime.Value.ToString("MMM dd, yyyy h:mm tt")
                                         </MudText>
                                     }
                                 </MudCardContent>

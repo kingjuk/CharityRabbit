@@ -24,6 +24,33 @@ public class Neo4jService : IDisposable
         return _driver.AsyncSession();
     }
 
+    public async Task InitializeDatabaseAsync()
+    {
+        await using var session = _driver.AsyncSession();
+        
+        // 1. Create Point Indexes for spatial search
+        await session.RunAsync("CREATE POINT INDEX goodwork_location_index IF NOT EXISTS FOR (g:GoodWork) ON (g.location)");
+        await session.RunAsync("CREATE POINT INDEX organization_location_index IF NOT EXISTS FOR (o:Organization) ON (o.location)");
+        
+        // 2. Create Constraints/Indexes for performance
+        await session.RunAsync("CREATE CONSTRAINT goodwork_id_unique IF NOT EXISTS FOR (g:GoodWork) REQUIRE g.id IS UNIQUE"); // Ideally we'd use auto-generated IDs or a UUID property
+        // Note: Using internal id() effectively, but for future proofing we might want a uuid. 
+        // For now, let's index common search fields
+        
+        await session.RunAsync("CREATE INDEX goodwork_status_index IF NOT EXISTS FOR (g:GoodWork) ON (g.status)");
+        await session.RunAsync("CREATE INDEX goodwork_start_time_index IF NOT EXISTS FOR (g:GoodWork) ON (g.startTime)");
+        await session.RunAsync("CREATE INDEX goodwork_created_date_index IF NOT EXISTS FOR (g:GoodWork) ON (g.createdDate)");
+        
+        // Organization indexes
+        await session.RunAsync("CREATE CONSTRAINT organization_slug_unique IF NOT EXISTS FOR (o:Organization) REQUIRE o.slug IS UNIQUE");
+        await session.RunAsync("CREATE INDEX organization_name_index IF NOT EXISTS FOR (o:Organization) ON (o.name)");
+        
+        // User indexes
+        await session.RunAsync("CREATE CONSTRAINT user_userid_unique IF NOT EXISTS FOR (u:User) REQUIRE u.userId IS UNIQUE");
+        
+        Console.WriteLine("Database indexes initialized.");
+    }
+
     public async Task CreateGoodWorkAsync(GoodWorksModel goodWork, string? userId = null)
     {
         var (city, state, country, zip) = await _locationServices.GetLocationDetailsAsync(goodWork.Latitude, goodWork.Longitude);
@@ -33,8 +60,10 @@ public class Neo4jService : IDisposable
                 name: $name, 
                 description: $description,
                 detailedDescription: $detailedDescription,
+                address: $address,
                 latitude: $latitude, 
                 longitude: $longitude,
+                location: point({latitude: $latitude, longitude: $longitude}),
                 startTime: datetime($startTime),
                 endTime: datetime($endTime),
                 effortLevel: $effortLevel,
@@ -98,6 +127,7 @@ public class Neo4jService : IDisposable
             name = goodWork.Name,
             description = goodWork.Description ?? string.Empty,
             detailedDescription = goodWork.DetailedDescription ?? string.Empty,
+            address = goodWork.Address ?? string.Empty,
             latitude = goodWork.Latitude,
             longitude = goodWork.Longitude,
             startTime = goodWork.StartTime?.ToString("o"),
@@ -260,16 +290,13 @@ public class Neo4jService : IDisposable
 
         if (criteria.CenterLatitude.HasValue && criteria.CenterLongitude.HasValue && criteria.RadiusMiles.HasValue)
         {
-            // Convert miles to degrees (approximate)
-            var latDelta = criteria.RadiusMiles.Value / 69.0;
-            var lonDelta = criteria.RadiusMiles.Value / (69.0 * Math.Cos(criteria.CenterLatitude.Value * Math.PI / 180));
+            // Convert miles to meters (1 mile = 1609.34 meters)
+            var radiusMeters = criteria.RadiusMiles.Value * 1609.34;
             
-            conditions.Add(@"g.latitude >= $minLat AND g.latitude <= $maxLat AND 
-                           g.longitude >= $minLng AND g.longitude <= $maxLng");
-            parameters["minLat"] = criteria.CenterLatitude.Value - latDelta;
-            parameters["maxLat"] = criteria.CenterLatitude.Value + latDelta;
-            parameters["minLng"] = criteria.CenterLongitude.Value - lonDelta;
-            parameters["maxLng"] = criteria.CenterLongitude.Value + lonDelta;
+            conditions.Add("point.distance(g.location, point({latitude: $centerLat, longitude: $centerLng})) < $radiusMeters");
+            parameters["centerLat"] = criteria.CenterLatitude.Value;
+            parameters["centerLng"] = criteria.CenterLongitude.Value;
+            parameters["radiusMeters"] = radiusMeters;
         }
 
         if (criteria.StartDateFrom.HasValue)
@@ -400,15 +427,13 @@ public class Neo4jService : IDisposable
 
         if (criteria.CenterLatitude.HasValue && criteria.CenterLongitude.HasValue && criteria.RadiusMiles.HasValue)
         {
-            var latDelta = criteria.RadiusMiles.Value / 69.0;
-            var lonDelta = criteria.RadiusMiles.Value / (69.0 * Math.Cos(criteria.CenterLatitude.Value * Math.PI / 180));
+            // Convert miles to meters (1 mile = 1609.34 meters)
+            var radiusMeters = criteria.RadiusMiles.Value * 1609.34;
             
-            conditions.Add(@"g.latitude >= $minLat AND g.latitude <= $maxLat AND 
-                           g.longitude >= $minLng AND g.longitude <= $maxLng");
-            parameters["minLat"] = criteria.CenterLatitude.Value - latDelta;
-            parameters["maxLat"] = criteria.CenterLatitude.Value + latDelta;
-            parameters["minLng"] = criteria.CenterLongitude.Value - lonDelta;
-            parameters["maxLng"] = criteria.CenterLongitude.Value + lonDelta;
+            conditions.Add("point.distance(g.location, point({latitude: $centerLat, longitude: $centerLng})) < $radiusMeters");
+            parameters["centerLat"] = criteria.CenterLatitude.Value;
+            parameters["centerLng"] = criteria.CenterLongitude.Value;
+            parameters["radiusMeters"] = radiusMeters;
         }
 
         if (criteria.StartDateFrom.HasValue)
@@ -814,8 +839,10 @@ public class Neo4jService : IDisposable
             SET g.name = $name,
                 g.description = $description,
                 g.detailedDescription = $detailedDescription,
+                g.address = $address,
                 g.latitude = $latitude,
                 g.longitude = $longitude,
+                g.location = point({latitude: $latitude, longitude: $longitude}),
                 g.startTime = datetime($startTime),
                 g.endTime = datetime($endTime),
                 g.effortLevel = $effortLevel,
@@ -866,6 +893,7 @@ public class Neo4jService : IDisposable
             name = goodWork.Name,
             description = goodWork.Description ?? string.Empty,
             detailedDescription = goodWork.DetailedDescription ?? string.Empty,
+            address = goodWork.Address ?? string.Empty,
             latitude = goodWork.Latitude,
             longitude = goodWork.Longitude,
             startTime = goodWork.StartTime?.ToString("o"),
@@ -1324,10 +1352,11 @@ public class Neo4jService : IDisposable
 
     public async Task<List<GoodWorksModel>> GetGoodWorksInBoundsAsync(double minLat, double maxLat, double minLng, double maxLng)
     {
+        // Using bounding box query with index hint
         var query = @"
             MATCH (g:GoodWork)
-            WHERE g.latitude >= $minLat AND g.latitude <= $maxLat
-                  AND g.longitude >= $minLng AND g.longitude <= $maxLng
+            WHERE g.location.latitude >= $minLat AND g.location.latitude <= $maxLat
+                  AND g.location.longitude >= $minLng AND g.location.longitude <= $maxLng
             OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
             OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
             OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)

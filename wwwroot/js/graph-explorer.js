@@ -66,10 +66,10 @@ window.initializeGraph = function () {
             },
             font: {
                 size: 11,
+                color: '#ffffff',
                 align: 'middle',
-                background: 'white',
-                strokeWidth: 2,
-                strokeColor: 'white'
+                background: 'transparent',
+                strokeWidth: 0
             }
         },
         physics: {

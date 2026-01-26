@@ -29,7 +29,7 @@
                 </MudText>
                 
                 <MudText Typo="Typo.body1" Class="mb-3">
-                    Import 100 sample Good Works and 10 organizations from the JSON file. All imported data will be tagged as TEST_DATA for easy cleanup.
+                    Import 20 sample Good Works and 10 organizations from the JSON file. All imported data will be tagged as TEST_DATA for easy cleanup.
                 </MudText>
 
                 @if (previewData != null && previewData.Any())
@@ -111,13 +111,13 @@
                 @if (testDataCount > 0)
                 {
                     <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-                        ?? This will delete <strong>@testDataCount</strong> test records and all related data (relationships, tags, etc.)
+                        ? This will delete <strong>@testDataCount</strong> test records and all related data (relationships, tags, etc.)
                     </MudAlert>
                 }
                 else
                 {
                     <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                        ?? No test data currently in database
+                        ? No test data currently in database
                     </MudAlert>
                 }
 
@@ -169,7 +169,10 @@
                     • Creates <strong>10 organizations</strong> covering all major service categories
                 </MudText>
                 <MudText Typo="Typo.body2" Class="mb-2">
-                    • Imports <strong>100 diverse volunteer opportunities</strong> across all 10 categories
+                    • Imports <strong>20 diverse volunteer opportunities</strong> across all 10 categories
+                </MudText>
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    • Each event includes <strong>appropriate skills</strong> based on the activity type (no effort levels)
                 </MudText>
                 <MudText Typo="Typo.body2" Class="mb-2">
                     • <strong>80% of events</strong> are assigned to organizations, <strong>20%</strong> remain as individual posts
@@ -178,7 +181,7 @@
                     • Each organization gets multiple events based on their focus areas
                 </MudText>
                 <MudText Typo="Typo.body2" Class="mb-2">
-                    • Data includes realistic details: dates, locations, contacts, effort levels, and more
+                    • Data includes realistic details: dates, locations, contacts, skills, and more
                 </MudText>
                 <MudText Typo="Typo.body2" Class="mb-2">
                     • Perfect for testing search, filtering, map views, organization profiles, and other features
