@@ -84,7 +84,7 @@ CharityRabbit uses Neo4j to model complex relationships between volunteers, even
 
 **GoodWork** - Volunteer opportunities with properties:
 - Basic: `name`, `description`, `detailedDescription`, `category`, `subCategory`
-- Location: `latitude`, `longitude`, `address`, `isVirtual`
+- Location: `location` (Point), `latitude`, `longitude`, `address`, `isVirtual`
 - Timing: `startTime`, `endTime`, `estimatedDuration`, `isRecurring`, `recurrencePattern`
 - Logistics: `effortLevel`, `maxParticipants`, `currentParticipants`, `minimumAge`
 - Features: `isAccessible`, `familyFriendly`, `parkingAvailable`, `publicTransitAccessible`
@@ -123,7 +123,7 @@ Core data service managing all database operations:
 - Search and filtering with complex criteria
 - Participant management
 - Recommendations and similar events
-- Geospatial queries (bounding box search)
+- Geospatial queries (using spatial POINT indexes for high performance)
 
 #### RecurringEventService
 Handles recurring event logic:
@@ -240,8 +240,7 @@ LIMIT 10
 **Find events within radius:**
 ```cypher
 MATCH (g:GoodWork)
-WHERE g.latitude >= $minLat AND g.latitude <= $maxLat
-  AND g.longitude >= $minLng AND g.longitude <= $maxLng
+WHERE point.distance(g.location, point({latitude: $centerLat, longitude: $centerLng})) < $radiusMeters
   AND g.status = 'Active'
 RETURN g
 ORDER BY g.startTime
@@ -418,4 +417,4 @@ See [docs/SOCIAL_MEDIA_IMAGES.md](docs/SOCIAL_MEDIA_IMAGES.md) for image optimiz
 - Average position in search results
 - Indexed pages count
 - Core Web Vitals scores
-- Social media sharing engagement
+- Social media sharing engagement- Social media sharing engagement
