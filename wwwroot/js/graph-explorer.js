@@ -155,29 +155,29 @@ window.renderGraph = function (nodesJson, edgesJson, dotNetRef) {
             return;
         }
 
-        // Process and add nodes
+        // Process and add nodes (using camelCase property names)
         const processedNodes = nodesData.map(node => ({
-            id: node.Id,
-            label: node.Title.length > 30 ? node.Title.substring(0, 27) + '...' : node.Title,
-            title: `${node.Type}: ${node.Title}`,
+            id: node.id,
+            label: node.title && node.title.length > 30 ? node.title.substring(0, 27) + '...' : (node.title || 'Unknown'),
+            title: `${node.type}: ${node.title || 'Unknown'}`,
             color: {
-                background: nodeColors[node.Type] || nodeColors['Default'],
+                background: nodeColors[node.type] || nodeColors['Default'],
                 border: '#2B7CE9',
                 highlight: {
-                    background: nodeColors[node.Type] || nodeColors['Default'],
+                    background: nodeColors[node.type] || nodeColors['Default'],
                     border: '#2B7CE9'
                 }
             },
-            group: node.Type
+            group: node.type
         }));
 
-        // Process and add edges
+        // Process and add edges (using camelCase property names)
         const processedEdges = edgesData.map(edge => ({
-            id: edge.Id,
-            from: edge.From,
-            to: edge.To,
-            label: edge.Label,
-            title: edge.Type,
+            id: edge.id,
+            from: edge.from,
+            to: edge.to,
+            label: edge.label,
+            title: edge.type,
             arrows: {
                 to: {
                     enabled: true,
@@ -223,33 +223,33 @@ window.addGraphData = function (nodesJson, edgesJson) {
         const nodesData = JSON.parse(nodesJson);
         const edgesData = JSON.parse(edgesJson);
 
-        // Process new nodes
+        // Process new nodes (using camelCase property names)
         const newNodes = nodesData
-            .filter(node => !nodes.get(node.Id))
+            .filter(node => !nodes.get(node.id))
             .map(node => ({
-                id: node.Id,
-                label: node.Title.length > 30 ? node.Title.substring(0, 27) + '...' : node.Title,
-                title: `${node.Type}: ${node.Title}`,
+                id: node.id,
+                label: node.title && node.title.length > 30 ? node.title.substring(0, 27) + '...' : (node.title || 'Unknown'),
+                title: `${node.type}: ${node.title || 'Unknown'}`,
                 color: {
-                    background: nodeColors[node.Type] || nodeColors['Default'],
+                    background: nodeColors[node.type] || nodeColors['Default'],
                     border: '#2B7CE9',
                     highlight: {
-                        background: nodeColors[node.Type] || nodeColors['Default'],
+                        background: nodeColors[node.type] || nodeColors['Default'],
                         border: '#2B7CE9'
                     }
                 },
-                group: node.Type
+                group: node.type
             }));
 
-        // Process new edges
+        // Process new edges (using camelCase property names)
         const newEdges = edgesData
-            .filter(edge => !edges.get(edge.Id))
+            .filter(edge => !edges.get(edge.id))
             .map(edge => ({
-                id: edge.Id,
-                from: edge.From,
-                to: edge.To,
-                label: edge.Label,
-                title: edge.Type
+                id: edge.id,
+                from: edge.from,
+                to: edge.to,
+                label: edge.label,
+                title: edge.type
             }));
 
         if (newNodes.length > 0) {

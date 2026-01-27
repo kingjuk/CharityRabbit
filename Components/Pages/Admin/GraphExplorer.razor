@@ -1,6 +1,7 @@
 @page "/admin/graph-explorer"
 @using CharityRabbit.Data
 @using System.Text.Json
+@using System.Text.Json.Serialization
 @using Microsoft.AspNetCore.Authorization
 @inject GraphExplorerService _graphService
 @inject IJSRuntime JSRuntime
@@ -287,6 +288,14 @@
     private int sampleLimit = 50;
     private string searchText = string.Empty;
 
+    // JSON serializer options to handle special floating-point values
+    private static readonly JsonSerializerOptions jsonOptions = new()
+    {
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     protected override async Task OnInitializedAsync()
     {
         await LoadStats();
@@ -378,8 +387,8 @@
         {
             var neighbors = await _graphService.GetNodeNeighborsAsync(nodeId, 1);
             await JSRuntime.InvokeVoidAsync("addGraphData", 
-                JsonSerializer.Serialize(neighbors.Nodes),
-                JsonSerializer.Serialize(neighbors.Edges));
+                JsonSerializer.Serialize(neighbors.Nodes, jsonOptions),
+                JsonSerializer.Serialize(neighbors.Edges, jsonOptions));
         }
         catch (Exception ex)
         {
@@ -394,11 +403,27 @@
 
     private async Task RenderGraph(GraphData graph)
     {
-        var nodesJson = JsonSerializer.Serialize(graph.Nodes);
-        var edgesJson = JsonSerializer.Serialize(graph.Edges);
-        
-        await JSRuntime.InvokeVoidAsync("renderGraph", nodesJson, edgesJson, 
-            DotNetObjectReference.Create(this));
+        try
+        {
+            Console.WriteLine($"RenderGraph called with {graph.Nodes.Count} nodes and {graph.Edges.Count} edges");
+            
+            var nodesJson = JsonSerializer.Serialize(graph.Nodes, jsonOptions);
+            var edgesJson = JsonSerializer.Serialize(graph.Edges, jsonOptions);
+            
+            Console.WriteLine($"Nodes JSON length: {nodesJson.Length}");
+            Console.WriteLine($"Edges JSON length: {edgesJson.Length}");
+            Console.WriteLine($"First 200 chars of nodes JSON: {(nodesJson.Length > 200 ? nodesJson.Substring(0, 200) : nodesJson)}");
+            
+            await JSRuntime.InvokeVoidAsync("renderGraph", nodesJson, edgesJson, 
+                DotNetObjectReference.Create(this));
+                
+            Console.WriteLine("renderGraph JavaScript function called successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in RenderGraph: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
     }
 
     [JSInvokable]

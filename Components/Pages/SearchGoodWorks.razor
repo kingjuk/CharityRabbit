@@ -1,4 +1,4 @@
-@page "/search"
+﻿@page "/search"
 @using CharityRabbit.Models
 @using CharityRabbit.Data
 @using GoogleMapsComponents
@@ -26,7 +26,7 @@
     <MudPaper Elevation="4" Class="pa-4">
         <MudText Typo="Typo.h4" GutterBottom="true">Find Good Works</MudText>
         
-        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4">
+        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" ActivePanelIndexChanged="OnTabChanged">
             <!-- Grid View Tab -->
             <MudTabPanel Text="Grid View" Icon="@Icons.Material.Filled.TableChart">
                 <MudGrid>
@@ -198,6 +198,21 @@
                         <MudPaper Elevation="2" Class="pa-3">
                             <MudText Typo="Typo.h6" GutterBottom="true">Filters</MudText>
                             
+                            @if (userLocation != null)
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                                    <MudIcon Icon="@Icons.Material.Filled.MyLocation" Size="MudBlazor.Size.Small" />
+                                    Showing events within @searchRadius miles of your location
+                                </MudAlert>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
+                                    <MudIcon Icon="@Icons.Material.Filled.LocationOff" Size="MudBlazor.Size.Small" />
+                                    Location access unavailable - showing all events nationwide
+                                </MudAlert>
+                            }
+
                             <MudSelect @bind-Value="searchCriteria.Category" Label="Category" Clearable="true" Class="mb-3">
                                 <MudSelectItem Value="@((string?)null)">All Categories</MudSelectItem>
                                 @foreach (var category in categories)
@@ -209,6 +224,8 @@
                             <MudDatePicker @bind-Date="startDateFrom" Label="Start Date From" Class="mb-3" />
                             <MudDatePicker @bind-Date="startDateTo" Label="Start Date To" Class="mb-3" />
 
+                            <MudNumericField @bind-Value="searchRadius" Label="Search Radius (miles)" Min="1" Max="100" Class="mb-3" />
+
                             <MudCheckBox @bind-Value="searchCriteria.IsVirtual" Label="Virtual Only" Class="mb-2" />
                             <MudCheckBox @bind-Value="searchCriteria.IsAccessible" Label="Wheelchair Accessible" Class="mb-2" />
                             <MudCheckBox @bind-Value="searchCriteria.FamilyFriendly" Label="Family Friendly" Class="mb-2" />
@@ -218,7 +235,7 @@
                                      Color="Color.Primary" 
                                      FullWidth="true"
                                      StartIcon="@Icons.Material.Filled.Search"
-                                     OnClick="PerformSearch"
+                                     OnClick="PerformMapSearch"
                                      Class="mb-2">
                                 Search
                             </MudButton>
@@ -263,6 +280,7 @@
                             {
                                 <div class="d-flex justify-center align-center" style="height: 100%;">
                                     <MudProgressCircular Indeterminate="true" Size="MudBlazor.Size.Large" />
+                                    <MudText Typo="Typo.h6" Class="ml-3">Finding events near you...</MudText>
                                 </div>
                             }
                             else
@@ -474,7 +492,7 @@
     private DateTime? startDateFrom;
     private DateTime? startDateTo;
     private string? zipCode;
-    private double searchRadius = 25;
+    private double searchRadius = 20; // Changed default to 20 miles
     private bool availableSpotsOnly = false;
     private List<string> selectedSkills = new();
     private string? selectedSkillFilter;
@@ -483,6 +501,9 @@
     private GoogleMap? _map;
     private MapOptions _mapOptions = new();
     private List<Marker> _markers = new();
+    private LatLngLiteral? userLocation;
+    private int currentTabIndex = 0;
+    private bool mapViewInitialized = false;
 
     // Calendar fields
     private DateTime currentCalendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
@@ -506,16 +527,16 @@
     // Category icon mapping
     private readonly Dictionary<string, string> categoryIcons = new()
     {
-        { "Food Bank", "???" },
-        { "Homeless Shelter", "??" },
-        { "Environmental", "??" },
-        { "Education", "??" },
-        { "Healthcare", "??" },
-        { "Animal Welfare", "??" },
-        { "Community Service", "??" },
-        { "Youth Programs", "??" },
-        { "Senior Care", "??" },
-        { "Disaster Relief", "??" }
+        { "Food Bank", "🍎" },
+        { "Homeless Shelter", "🏠" },
+        { "Environmental", "🌳" },
+        { "Education", "📚" },
+        { "Healthcare", "🏥" },
+        { "Animal Welfare", "🐾" },
+        { "Community Service", "🤝" },
+        { "Youth Programs", "👦" },
+        { "Senior Care", "👴" },
+        { "Disaster Relief", "🚨" }
     };
 
     // Category color mapping for markers
@@ -535,13 +556,13 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Try to get user's location, fall back to Huntsville, AL
-        var userLocation = await TryGetUserLocation();
+        // Get user's location
+        userLocation = await TryGetUserLocation();
         
         _mapOptions = new MapOptions
         {
             Zoom = 11,
-            Center = userLocation,
+            Center = userLocation ?? new LatLngLiteral(34.7304, -86.5861),
             MapTypeId = MapTypeId.Roadmap
         };
 
@@ -549,11 +570,70 @@
         await LoadUpcomingEvents();
     }
 
-    private async Task<LatLngLiteral> TryGetUserLocation()
+    private async Task OnTabChanged(int index)
     {
-        // Default location (Huntsville, AL)
-        var defaultLocation = new LatLngLiteral(34.7304, -86.5861);
+        currentTabIndex = index;
         
+        // If switching to map view (index 1) and not initialized yet
+        if (index == 1 && !mapViewInitialized)
+        {
+            mapViewInitialized = true;
+            await Task.Delay(100); // Small delay to ensure map is rendered
+            
+            // Load events - if user location available, search nearby; otherwise load all recent events
+            if (userLocation != null)
+            {
+                await LoadMapViewEvents();
+            }
+            else
+            {
+                // No user location, just load upcoming events and show them all
+                if (searchResults == null || !searchResults.Any())
+                {
+                    await LoadUpcomingEvents();
+                }
+                await UpdateMapMarkers();
+            }
+        }
+    }
+
+    private async Task LoadMapViewEvents()
+    {
+        isLoading = true;
+
+        // Set date range to next 3 months
+        startDateFrom = DateTime.Today;
+        startDateTo = DateTime.Today.AddMonths(3);
+
+        searchCriteria.StartDateFrom = startDateFrom;
+        searchCriteria.StartDateTo = startDateTo;
+        
+        if (userLocation.HasValue)
+        {
+            searchCriteria.CenterLatitude = userLocation.Value.Lat;
+            searchCriteria.CenterLongitude = userLocation.Value.Lng;
+            searchCriteria.RadiusMiles = searchRadius;
+        }
+
+        try
+        {
+            searchResults = await _neo4jService.SearchGoodWorksAsync(searchCriteria);
+            filteredResults = searchResults;
+            
+            // Update map markers
+            await UpdateMapMarkers();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading map view events: {ex.Message}");
+            searchResults = new List<GoodWorksModel>();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task<LatLngLiteral?> TryGetUserLocation()
+    {
         try
         {
             // Try to get user's current location from browser
@@ -565,13 +645,13 @@
                 return new LatLngLiteral(result.Latitude, result.Longitude);
             }
             
-            Console.WriteLine("Using default location (Huntsville, AL)");
-            return defaultLocation;
+            Console.WriteLine("Could not get user location");
+            return null;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Geolocation error: {ex.Message}. Using default location.");
-            return defaultLocation;
+            Console.WriteLine($"Geolocation error: {ex.Message}");
+            return null;
         }
     }
 
@@ -631,6 +711,36 @@
         
         // Update calendar events
         UpdateCalendarEvents();
+        
+        // Update map markers if on map view
+        if (currentTabIndex == 1)
+        {
+            await UpdateMapMarkers();
+        }
+        
+        isLoading = false;
+    }
+
+    private async Task PerformMapSearch()
+    {
+        if (userLocation == null)
+        {
+            // If no user location, perform regular search
+            await PerformSearch();
+            return;
+        }
+
+        isLoading = true;
+        
+        searchCriteria.StartDateFrom = startDateFrom;
+        searchCriteria.StartDateTo = startDateTo;
+        searchCriteria.HasAvailableSpots = availableSpotsOnly;
+        searchCriteria.CenterLatitude = userLocation.Value.Lat;
+        searchCriteria.CenterLongitude = userLocation.Value.Lng;
+        searchCriteria.RadiusMiles = searchRadius;
+
+        searchResults = await _neo4jService.SearchGoodWorksAsync(searchCriteria);
+        filteredResults = searchResults;
         
         // Update map markers
         await UpdateMapMarkers();
@@ -741,7 +851,7 @@
         startDateFrom = null;
         startDateTo = null;
         zipCode = null;
-        searchRadius = 25;
+        searchRadius = 20; // Reset to 20 miles
         availableSpotsOnly = false;
         selectedSkills.Clear();
         searchResults = null;
@@ -754,6 +864,9 @@
         currentCalendarMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         selectedDate = null;
         calendarEvents = new();
+        
+        // Reset map view initialization flag
+        mapViewInitialized = false;
     }
 
     private async Task<IEnumerable<string>> SearchSkills(string value, CancellationToken token)
@@ -794,7 +907,7 @@
 
     private async Task OnMapInitialized()
     {
-        if (searchResults != null)
+        if (searchResults != null && searchResults.Any())
         {
             await UpdateMapMarkers();
         }
@@ -809,12 +922,18 @@
 
         ClearMarkers();
 
+        // Create list to track bounds
+        var bounds = new List<LatLngLiteral>();
+
         foreach (var goodWork in searchResults)
         {
             if (goodWork.Latitude == 0 && goodWork.Longitude == 0) continue;
 
             try
             {
+                var position = new LatLngLiteral(goodWork.Latitude, goodWork.Longitude);
+                bounds.Add(position);
+
                 var color = categoryColors.ContainsKey(goodWork.Category ?? "") 
                     ? categoryColors[goodWork.Category ?? ""] 
                     : "#1976d2";
@@ -825,7 +944,7 @@
 
                 var marker = await Marker.CreateAsync(_map.JsRuntime, new MarkerOptions
                 {
-                    Position = new LatLngLiteral(goodWork.Latitude, goodWork.Longitude),
+                    Position = position,
                     Map = _map.InteropObject,
                     Title = goodWork.Name,
                     Icon = new Icon
@@ -901,7 +1020,7 @@
                                     </a>
                                 </div>
                             </div>",
-                        Position = new LatLngLiteral(goodWorkForClosure.Latitude, goodWorkForClosure.Longitude)
+                        Position = position
                     });
 
                     await infoWindow.Open(_map.InteropObject);
@@ -915,18 +1034,80 @@
             }
         }
 
-        if (searchResults.Any())
+        // Fit map bounds to show all markers
+        if (bounds.Any())
         {
             try
             {
-                var avgLat = searchResults.Average(g => g.Latitude);
-                var avgLng = searchResults.Average(g => g.Longitude);
-                await _map.InteropObject.SetCenter(new LatLngLiteral(avgLat, avgLng));
+                // Calculate bounds
+                var minLat = bounds.Min(b => b.Lat);
+                var maxLat = bounds.Max(b => b.Lat);
+                var minLng = bounds.Min(b => b.Lng);
+                var maxLng = bounds.Max(b => b.Lng);
+
+                // Create LatLngBounds
+                var sw = new LatLngLiteral(minLat, minLng);
+                var ne = new LatLngLiteral(maxLat, maxLng);
+                
+                // Add padding to bounds (10% on each side)
+                var latPadding = (maxLat - minLat) * 0.1;
+                var lngPadding = (maxLng - minLng) * 0.1;
+                
+                sw = new LatLngLiteral(minLat - latPadding, minLng - lngPadding);
+                ne = new LatLngLiteral(maxLat + latPadding, maxLng + lngPadding);
+                
+                // Use JavaScript to fit bounds (GoogleMapsComponents doesn't have direct FitBounds support)
+                await JSRuntime.InvokeVoidAsync("eval", $@"
+                    if (window.googleMapsInstances && window.googleMapsInstances['map1']) {{
+                        var map = window.googleMapsInstances['map1'];
+                        var bounds = new google.maps.LatLngBounds(
+                            new google.maps.LatLng({sw.Lat.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, {sw.Lng.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}),
+                            new google.maps.LatLng({ne.Lat.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)}, {ne.Lng.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)})
+                        );
+                        map.fitBounds(bounds);
+                        
+                        // Limit max zoom for single markers
+                        setTimeout(function() {{
+                            var currentZoom = map.getZoom();
+                            if (currentZoom > 14) {{
+                                map.setZoom(14);
+                            }}
+                        }}, 100);
+                    }}
+                ");
+                
+                Console.WriteLine($"Map bounds fitted: SW({sw.Lat}, {sw.Lng}) to NE({ne.Lat}, {ne.Lng})");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error centering map: {ex.Message}");
+                Console.WriteLine($"Error fitting map bounds: {ex.Message}");
+                
+                // Fallback: center on average position
+                var avgLat = bounds.Average(b => b.Lat);
+                var avgLng = bounds.Average(b => b.Lng);
+                await _map.InteropObject.SetCenter(new LatLngLiteral(avgLat, avgLng));
+                
+                // Determine appropriate zoom based on spread of markers
+                var latSpread = bounds.Max(b => b.Lat) - bounds.Min(b => b.Lat);
+                var lngSpread = bounds.Max(b => b.Lng) - bounds.Min(b => b.Lng);
+                var maxSpread = Math.Max(latSpread, lngSpread);
+                
+                // Calculate zoom level (rough approximation)
+                var zoom = maxSpread > 10 ? 4 : maxSpread > 5 ? 6 : maxSpread > 2 ? 8 : maxSpread > 1 ? 10 : maxSpread > 0.5 ? 11 : 12;
+                await _map.InteropObject.SetZoom(zoom);
             }
+        }
+        else if (userLocation != null)
+        {
+            // No markers found, center on user location
+            await _map.InteropObject.SetCenter(userLocation.Value);
+            await _map.InteropObject.SetZoom(11);
+        }
+        else
+        {
+            // No markers and no user location - center on continental US
+            await _map.InteropObject.SetCenter(new LatLngLiteral(39.8283, -98.5795)); // Geographic center of US
+            await _map.InteropObject.SetZoom(4);
         }
     }
 

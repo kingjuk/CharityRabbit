@@ -313,7 +313,35 @@ public class GraphExplorerService
     private GraphNode MapNode(INode node)
     {
         var labels = node.Labels.ToList();
-        var props = node.Properties.ToDictionary(p => p.Key, p => p.Value);
+        var props = new Dictionary<string, object>();
+
+        // Process properties and handle special types
+        foreach (var prop in node.Properties)
+        {
+            var value = prop.Value;
+            
+            // Handle Neo4j Point type
+            if (value is Point point)
+            {
+                // Convert Point to a simple coordinate object
+                props[prop.Key] = new 
+                {
+                    latitude = point.Y,
+                    longitude = point.X,
+                    srid = point.SrId
+                };
+            }
+            // Handle other types that might cause serialization issues
+            else if (value is double d && (double.IsInfinity(d) || double.IsNaN(d)))
+            {
+                // Convert infinity/NaN to null or string representation
+                props[prop.Key] = d.ToString();
+            }
+            else if (value != null)
+            {
+                props[prop.Key] = value;
+            }
+        }
 
         // Try to get a display title from common properties
         string? title = null;
