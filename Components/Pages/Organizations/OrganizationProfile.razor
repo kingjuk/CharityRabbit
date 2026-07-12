@@ -4,7 +4,7 @@
 @using System.Security.Claims
 @using Neo4j.Driver
 @inject OrganizationService _organizationService
-@inject Neo4jService _neo4jService
+@inject GoodWorksService _neo4jService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IDialogService DialogService
@@ -67,7 +67,7 @@
                                 @organization.OrganizationType
                                 @if (!string.IsNullOrEmpty(organization.City))
                                 {
-                                    <text> • @organization.City, @organization.State</text>
+                                    <text> ï¿½ @organization.City, @organization.State</text>
                                 }
                             </MudText>
                         </div>
@@ -365,80 +365,8 @@
         }
     }
 
-    private async Task<List<GoodWorksModel>> GetOrganizationEventsAsync(long organizationId)
-    {
-        Console.WriteLine($"DEBUG: Loading events for organization ID: {organizationId}");
-        
-        // Create a session to query events posted by this organization
-        using var session = _neo4jService.GetSession();
-        
-        // First, let's check if the relationship exists
-        var checkQuery = @"
-            MATCH (o:Organization)
-            WHERE id(o) = $orgId
-            OPTIONAL MATCH (o)<-[:POSTED_BY]-(g:GoodWork)
-            RETURN count(g) as eventCount, collect(g.name) as eventNames";
-
-        var checkResult = await session.ExecuteReadAsync(async tx =>
-        {
-            var cursor = await tx.RunAsync(checkQuery, new { orgId = organizationId });
-            var record = await cursor.SingleAsync();
-            var count = record["eventCount"].As<int>();
-            var names = record["eventNames"].As<List<object>>();
-            Console.WriteLine($"DEBUG: Found {count} events for organization");
-            foreach (var name in names)
-            {
-                Console.WriteLine($"DEBUG: Event name: {name}");
-            }
-            return count;
-        });
-
-        var query = @"
-            MATCH (g:GoodWork)-[:POSTED_BY]->(o:Organization)
-            WHERE id(o) = $orgId AND g.status = 'Active'
-            OPTIONAL MATCH (g)-[:HAS_CONTACT]->(c:Contact)
-            OPTIONAL MATCH (g)-[:BELONGS_TO]->(cat:Category)
-            OPTIONAL MATCH (g)-[:LOCATED_IN]->(l:Location)
-            RETURN id(g) AS Id, g, c, cat, l
-            ORDER BY g.startTime DESC";
-
-        var result = await session.ExecuteReadAsync(async tx =>
-        {
-            var cursor = await tx.RunAsync(query, new { orgId = organizationId });
-            var events = new List<GoodWorksModel>();
-
-            await foreach (var record in cursor)
-            {
-                var gNode = record["g"].As<INode>();
-                var props = gNode.Properties;
-                
-                Console.WriteLine($"DEBUG: Found event: {props["name"].As<string>()} (ID: {record["Id"].As<long>()})");
-                
-                var evt = new GoodWorksModel
-                {
-                    Id = record["Id"].As<long>(),
-                    Name = props["name"].As<string>(),
-                    Description = props.ContainsKey("description") ? props["description"].As<string>() : "",
-                    Category = props.ContainsKey("category") ? props["category"].As<string>() : "",
-                    Latitude = props.ContainsKey("latitude") ? props["latitude"].As<double>() : 0,
-                    Longitude = props.ContainsKey("longitude") ? props["longitude"].As<double>() : 0,
-                    Status = props.ContainsKey("status") ? props["status"].As<string>() : "Active"
-                };
-
-                if (props.ContainsKey("startTime") && props["startTime"] != null)
-                {
-                    evt.StartTime = props["startTime"].As<ZonedDateTime?>()?.ToDateTimeOffset().DateTime;
-                }
-
-                events.Add(evt);
-            }
-
-            Console.WriteLine($"DEBUG: Returning {events.Count} events");
-            return events;
-        });
-
-        return result;
-    }
+    private Task<List<GoodWorksModel>> GetOrganizationEventsAsync(long organizationId) =>
+        _neo4jService.GetOrganizationEventsAsync(organizationId);
 
     private async Task JoinOrganization()
     {

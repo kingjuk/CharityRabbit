@@ -1,623 +1,253 @@
 using CharityRabbit.Models;
-using Neo4j.Driver;
+using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
 
 namespace CharityRabbit.Data;
 
-public class OrganizationService
+// Organizations, members/admins, backed by PostgreSQL (EF Core). Public API unchanged.
+public class OrganizationService(CharityDbContext db)
 {
-    private readonly IDriver _driver;
-
-    public OrganizationService(IDriver driver)
+    private static string GenerateSlug(string name)
     {
-        _driver = driver;
-    }
-
-    /// <summary>
-    /// Generates a URL-friendly slug from organization name
-    /// </summary>
-    private string GenerateSlug(string name)
-    {
-        // Convert to lowercase and replace spaces with hyphens
         var slug = name.ToLowerInvariant().Trim();
-        slug = Regex.Replace(slug, @"[^a-z0-9\s-]", ""); // Remove special characters
-        slug = Regex.Replace(slug, @"\s+", "-"); // Replace spaces with hyphens
-        slug = Regex.Replace(slug, @"-+", "-"); // Replace multiple hyphens with single
-        return slug;
+        slug = Regex.Replace(slug, @"[^a-z0-9\s-]", "");
+        slug = Regex.Replace(slug, @"\s+", "-");
+        return Regex.Replace(slug, @"-+", "-");
     }
 
-    /// <summary>
-    /// Check if slug is already in use
-    /// </summary>
-    public async Task<bool> IsSlugAvailableAsync(string slug, long? excludeOrgId = null)
-    {
-        await using var session = _driver.AsyncSession();
-        
-        var query = excludeOrgId.HasValue
-            ? "MATCH (o:Organization {slug: $slug}) WHERE id(o) <> $excludeId RETURN count(o) as count"
-            : "MATCH (o:Organization {slug: $slug}) RETURN count(o) as count";
+    private static DateTimeOffset? ToDto(DateTime? v) =>
+        v.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(v.Value, DateTimeKind.Utc)) : null;
+    private static DateTime? FromDto(DateTimeOffset? v) => v?.UtcDateTime;
 
-        var result = await session.ExecuteReadAsync(async tx =>
-        {
-            var cursor = await tx.RunAsync(query, new { slug, excludeId = excludeOrgId });
-            var record = await cursor.SingleAsync();
-            return record["count"].As<int>();
-        });
+    public async Task<bool> IsSlugAvailableAsync(string slug, long? excludeOrgId = null) =>
+        !await db.Organizations.AnyAsync(o => o.Slug == slug && (excludeOrgId == null || o.Id != excludeOrgId));
 
-        return result == 0;
-    }
-
-    /// <summary>
-    /// Create a new organization
-    /// </summary>
     public async Task<OrganizationModel> CreateOrganizationAsync(OrganizationModel organization, string userId)
     {
-        await using var session = _driver.AsyncSession();
-
-        // Generate slug if not provided
         if (string.IsNullOrEmpty(organization.Slug))
         {
             organization.Slug = GenerateSlug(organization.Name);
-            
-            // Ensure uniqueness
             var baseSlug = organization.Slug;
             var counter = 1;
             while (!await IsSlugAvailableAsync(organization.Slug))
-            {
-                organization.Slug = $"{baseSlug}-{counter}";
-                counter++;
-            }
+                organization.Slug = $"{baseSlug}-{counter++}";
         }
-
         organization.CreatedBy = userId;
         organization.CreatedDate = DateTime.UtcNow;
         organization.Status = "Active";
 
-        return await session.ExecuteWriteAsync(async tx =>
-        {
-            // Create organization node
-            var orgQuery = @"
-                CREATE (o:Organization {
-                    name: $name,
-                    slug: $slug,
-                    description: $description,
-                    mission: $mission,
-                    vision: $vision,
-                    contactEmail: $contactEmail,
-                    contactPhone: $contactPhone,
-                    website: $website,
-                    address: $address,
-                    city: $city,
-                    state: $state,
-                    country: $country,
-                    zipCode: $zipCode,
-                    latitude: $latitude,
-                    longitude: $longitude,
-                    location: point({latitude: $latitude, longitude: $longitude}),
-                    organizationType: $organizationType,
-                    taxId: $taxId,
-                    foundedDate: $foundedDate,
-                    logoUrl: $logoUrl,
-                    coverImageUrl: $coverImageUrl,
-                    facebookUrl: $facebookUrl,
-                    twitterUrl: $twitterUrl,
-                    instagramUrl: $instagramUrl,
-                    linkedInUrl: $linkedInUrl,
-                    focusAreas: $focusAreas,
-                    tags: $tags,
-                    createdBy: $createdBy,
-                    createdDate: $createdDate,
-                    status: $status,
-                    isVerified: $isVerified
-                })
-                RETURN id(o) as id, o";
+        var entity = new Organization();
+        ApplyAll(organization, entity);
+        db.Organizations.Add(entity);
+        if (!await db.Users.AnyAsync(u => u.UserId == userId)) db.Users.Add(new User { UserId = userId });
+        await db.SaveChangesAsync();
 
-            var orgCursor = await tx.RunAsync(orgQuery, new
-            {
-                name = organization.Name,
-                slug = organization.Slug,
-                description = organization.Description,
-                mission = organization.Mission,
-                vision = organization.Vision,
-                contactEmail = organization.ContactEmail,
-                contactPhone = organization.ContactPhone,
-                website = organization.Website,
-                address = organization.Address,
-                city = organization.City,
-                state = organization.State,
-                country = organization.Country,
-                zipCode = organization.ZipCode,
-                latitude = organization.Latitude,
-                longitude = organization.Longitude,
-                organizationType = organization.OrganizationType,
-                taxId = organization.TaxId,
-                foundedDate = organization.FoundedDate,
-                logoUrl = organization.LogoUrl,
-                coverImageUrl = organization.CoverImageUrl,
-                facebookUrl = organization.FacebookUrl,
-                twitterUrl = organization.TwitterUrl,
-                instagramUrl = organization.InstagramUrl,
-                linkedInUrl = organization.LinkedInUrl,
-                focusAreas = organization.FocusAreas,
-                tags = organization.Tags,
-                createdBy = organization.CreatedBy,
-                createdDate = organization.CreatedDate,
-                status = organization.Status,
-                isVerified = organization.IsVerified
-            });
+        db.OrganizationAdmins.Add(new OrganizationAdmin { OrganizationId = entity.Id, UserId = userId, Since = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync();
 
-            var orgRecord = await orgCursor.SingleAsync();
-            organization.Id = orgRecord["id"].As<long>();
-
-            // Create admin relationship
-            var adminQuery = @"
-                MATCH (o:Organization), (u:User {userId: $userId})
-                WHERE id(o) = $orgId
-                MERGE (u)-[r:ADMIN_OF {since: $since}]->(o)
-                RETURN r";
-
-            await tx.RunAsync(adminQuery, new
-            {
-                orgId = organization.Id,
-                userId,
-                since = DateTime.UtcNow
-            });
-
-            return organization;
-        });
+        organization.Id = entity.Id;
+        return organization;
     }
 
-    /// <summary>
-    /// Get organization by slug
-    /// </summary>
     public async Task<OrganizationModel?> GetOrganizationBySlugAsync(string slug, string? userId = null)
     {
-        await using var session = _driver.AsyncSession();
+        var o = await db.Organizations.FirstOrDefaultAsync(x => x.Slug == slug);
+        if (o is null) return null;
 
-        return await session.ExecuteReadAsync(async tx =>
+        var model = MapFull(o);
+        var memberIds = db.OrganizationMembers.Where(m => m.OrganizationId == o.Id).Select(m => m.UserId);
+        var adminIds = db.OrganizationAdmins.Where(a => a.OrganizationId == o.Id).Select(a => a.UserId);
+        model.MemberCount = await memberIds.Union(adminIds).CountAsync();
+        model.EventCount = await db.GoodWorks.CountAsync(g => g.OrganizationId == o.Id);
+        model.VolunteerCount = await db.Signups.Where(s => s.GoodWork.OrganizationId == o.Id).Select(s => s.UserId).Distinct().CountAsync();
+
+        if (!string.IsNullOrEmpty(userId))
         {
-            var query = @"
-                MATCH (o:Organization {slug: $slug})
-                OPTIONAL MATCH (o)<-[:ADMIN_OF]-(admin:User)
-                OPTIONAL MATCH (o)<-[:MEMBER_OF]-(member:User)
-                OPTIONAL MATCH (o)<-[:POSTED_BY]-(gw:GoodWork)
-                OPTIONAL MATCH (gw)<-[:SIGNED_UP_FOR]-(volunteer:User)
-                WITH o, count(DISTINCT admin) + count(DISTINCT member) as memberCount,
-                     count(DISTINCT gw) as eventCount,
-                     count(DISTINCT volunteer) as volunteerCount
-                RETURN o, memberCount, eventCount, volunteerCount";
-
-            var cursor = await tx.RunAsync(query, new { slug });
-            
-            if (!await cursor.FetchAsync())
-                return null;
-
-            var record = cursor.Current;
-            var node = record["o"].As<INode>();
-            var props = node.Properties;
-
-            var org = new OrganizationModel
-            {
-                Id = node.Id,
-                Name = props["name"].As<string>(),
-                Slug = props["slug"].As<string>(),
-                Description = props["description"].As<string>(),
-                Mission = props.ContainsKey("mission") ? props["mission"].As<string?>() : null,
-                Vision = props.ContainsKey("vision") ? props["vision"].As<string?>() : null,
-                ContactEmail = props["contactEmail"].As<string>(),
-                ContactPhone = props.ContainsKey("contactPhone") ? props["contactPhone"].As<string?>() : null,
-                Website = props.ContainsKey("website") ? props["website"].As<string?>() : null,
-                Address = props.ContainsKey("address") ? props["address"].As<string?>() : null,
-                City = props.ContainsKey("city") ? props["city"].As<string?>() : null,
-                State = props.ContainsKey("state") ? props["state"].As<string?>() : null,
-                Country = props.ContainsKey("country") ? props["country"].As<string?>() : null,
-                ZipCode = props.ContainsKey("zipCode") ? props["zipCode"].As<string?>() : null,
-                Latitude = props.ContainsKey("latitude") ? props["latitude"].As<double?>() : null,
-                Longitude = props.ContainsKey("longitude") ? props["longitude"].As<double?>() : null,
-                OrganizationType = props.ContainsKey("organizationType") ? props["organizationType"].As<string?>() : null,
-                TaxId = props.ContainsKey("taxId") ? props["taxId"].As<string?>() : null,
-                FoundedDate = props.ContainsKey("foundedDate") ? props["foundedDate"].As<ZonedDateTime?>()?.ToDateTimeOffset().DateTime : null,
-                LogoUrl = props.ContainsKey("logoUrl") ? props["logoUrl"].As<string?>() : null,
-                CoverImageUrl = props.ContainsKey("coverImageUrl") ? props["coverImageUrl"].As<string?>() : null,
-                FacebookUrl = props.ContainsKey("facebookUrl") ? props["facebookUrl"].As<string?>() : null,
-                TwitterUrl = props.ContainsKey("twitterUrl") ? props["twitterUrl"].As<string?>() : null,
-                InstagramUrl = props.ContainsKey("instagramUrl") ? props["instagramUrl"].As<string?>() : null,
-                LinkedInUrl = props.ContainsKey("linkedInUrl") ? props["linkedInUrl"].As<string?>() : null,
-                FocusAreas = props.ContainsKey("focusAreas") ? props["focusAreas"].As<List<string>>() : null,
-                Tags = props.ContainsKey("tags") ? props["tags"].As<List<string>>() : null,
-                CreatedBy = props["createdBy"].As<string>(),
-                CreatedDate = props["createdDate"].As<ZonedDateTime>().ToDateTimeOffset().DateTime,
-                LastModifiedDate = props.ContainsKey("lastModifiedDate") ? props["lastModifiedDate"].As<ZonedDateTime?>()?.ToDateTimeOffset().DateTime : null,
-                Status = props["status"].As<string>(),
-                IsVerified = props.ContainsKey("isVerified") && props["isVerified"].As<bool>(),
-                MemberCount = record["memberCount"].As<int>(),
-                EventCount = record["eventCount"].As<int>(),
-                VolunteerCount = record["volunteerCount"].As<int>()
-            };
-
-            // Check if user is admin or member
-            if (!string.IsNullOrEmpty(userId))
-            {
-                var userQuery = @"
-                    MATCH (o:Organization {slug: $slug})
-                    MATCH (u:User {userId: $userId})
-                    OPTIONAL MATCH (u)-[admin:ADMIN_OF]->(o)
-                    OPTIONAL MATCH (u)-[member:MEMBER_OF]->(o)
-                    RETURN admin IS NOT NULL as isAdmin, (admin IS NOT NULL OR member IS NOT NULL) as isMember";
-
-                var userCursor = await tx.RunAsync(userQuery, new { slug, userId });
-                if (await userCursor.FetchAsync())
-                {
-                    var userRecord = userCursor.Current;
-                    org.IsUserAdmin = userRecord["isAdmin"].As<bool>();
-                    org.IsUserMember = userRecord["isMember"].As<bool>();
-                }
-            }
-
-            return org;
-        });
+            model.IsUserAdmin = await db.OrganizationAdmins.AnyAsync(a => a.OrganizationId == o.Id && a.UserId == userId);
+            model.IsUserMember = model.IsUserAdmin || await db.OrganizationMembers.AnyAsync(m => m.OrganizationId == o.Id && m.UserId == userId);
+        }
+        return model;
     }
 
-    /// <summary>
-    /// Get all organizations (with pagination)
-    /// </summary>
     public async Task<List<OrganizationModel>> GetOrganizationsAsync(int skip = 0, int limit = 20, string? searchTerm = null)
     {
-        await using var session = _driver.AsyncSession();
+        var term = searchTerm?.ToLower();
+        var orgs = await db.Organizations
+            .Where(o => o.Status == "Active" && (term == null
+                || o.Name.ToLower().Contains(term) || o.Description.ToLower().Contains(term)
+                || (o.City != null && o.City.ToLower().Contains(term))))
+            .OrderByDescending(o => o.CreatedDate).Skip(skip).Take(limit).ToListAsync();
 
-        return await session.ExecuteReadAsync(async tx =>
-        {
-            var whereClause = string.IsNullOrEmpty(searchTerm)
-                ? "WHERE o.status = 'Active'"
-                : "WHERE o.status = 'Active' AND (toLower(o.name) CONTAINS toLower($searchTerm) OR toLower(o.description) CONTAINS toLower($searchTerm) OR toLower(o.city) CONTAINS toLower($searchTerm))";
-
-            var query = $@"
-                MATCH (o:Organization)
-                {whereClause}
-                OPTIONAL MATCH (o)<-[:MEMBER_OF|ADMIN_OF]-(member:User)
-                OPTIONAL MATCH (o)<-[:POSTED_BY]-(event:GoodWork)
-                WITH o, count(DISTINCT member) as memberCount, count(DISTINCT event) as eventCount
-                ORDER BY o.createdDate DESC
-                SKIP $skip
-                LIMIT $limit
-                RETURN o, memberCount, eventCount";
-
-            var cursor = await tx.RunAsync(query, new { skip, limit, searchTerm });
-            var organizations = new List<OrganizationModel>();
-
-            await foreach (var record in cursor)
-            {
-                var node = record["o"].As<INode>();
-                var props = node.Properties;
-
-                organizations.Add(new OrganizationModel
-                {
-                    Id = node.Id,
-                    Name = props["name"].As<string>(),
-                    Slug = props["slug"].As<string>(),
-                    Description = props["description"].As<string>(),
-                    LogoUrl = props.ContainsKey("logoUrl") ? props["logoUrl"].As<string?>() : null,
-                    OrganizationType = props.ContainsKey("organizationType") ? props["organizationType"].As<string?>() : null,
-                    City = props.ContainsKey("city") ? props["city"].As<string?>() : null,
-                    State = props.ContainsKey("state") ? props["state"].As<string?>() : null,
-                    FocusAreas = props.ContainsKey("focusAreas") ? props["focusAreas"].As<List<string>>() : null,
-                    MemberCount = record["memberCount"].As<int>(),
-                    EventCount = record["eventCount"].As<int>(),
-                    IsVerified = props.ContainsKey("isVerified") && props["isVerified"].As<bool>(),
-                    CreatedDate = props["createdDate"].As<ZonedDateTime>().ToDateTimeOffset().DateTime
-                });
-            }
-
-            return organizations;
-        });
+        return await WithCounts(orgs);
     }
 
-    /// <summary>
-    /// Count organizations (with optional search)
-    /// </summary>
     public async Task<int> CountOrganizationsAsync(string? searchTerm = null)
     {
-        await using var session = _driver.AsyncSession();
-
-        return await session.ExecuteReadAsync(async tx =>
-        {
-            var whereClause = string.IsNullOrEmpty(searchTerm)
-                ? "WHERE o.status = 'Active'"
-                : "WHERE o.status = 'Active' AND (toLower(o.name) CONTAINS toLower($searchTerm) OR toLower(o.description) CONTAINS toLower($searchTerm) OR toLower(o.city) CONTAINS toLower($searchTerm))";
-
-            var query = $@"
-                MATCH (o:Organization)
-                {whereClause}
-                RETURN count(o) as totalCount";
-
-            var cursor = await tx.RunAsync(query, new { searchTerm });
-            var record = await cursor.SingleAsync();
-            return record["totalCount"].As<int>();
-        });
+        var term = searchTerm?.ToLower();
+        return await db.Organizations.CountAsync(o => o.Status == "Active" && (term == null
+            || o.Name.ToLower().Contains(term) || o.Description.ToLower().Contains(term)
+            || (o.City != null && o.City.ToLower().Contains(term))));
     }
 
-    /// <summary>
-    /// Get user's organizations (where user is admin or member)
-    /// </summary>
     public async Task<List<OrganizationModel>> GetUserOrganizationsAsync(string userId)
     {
-        await using var session = _driver.AsyncSession();
+        var adminOrgIds = await db.OrganizationAdmins.Where(a => a.UserId == userId).Select(a => a.OrganizationId).ToListAsync();
+        var memberOrgIds = await db.OrganizationMembers.Where(m => m.UserId == userId).Select(m => m.OrganizationId).ToListAsync();
+        var ids = adminOrgIds.Concat(memberOrgIds).Distinct().ToList();
 
-        return await session.ExecuteReadAsync(async tx =>
+        var orgs = await db.Organizations.Where(o => ids.Contains(o.Id) && o.Status == "Active")
+            .OrderBy(o => o.Name).ToListAsync();
+        var models = await WithCounts(orgs);
+        foreach (var m in models)
         {
-            var query = @"
-                MATCH (u:User {userId: $userId})-[r:ADMIN_OF|MEMBER_OF]->(o:Organization)
-                WHERE o.status = 'Active'
-                OPTIONAL MATCH (o)<-[:MEMBER_OF|ADMIN_OF]-(member:User)
-                OPTIONAL MATCH (o)<-[:POSTED_BY]-(event:GoodWork)
-                WITH o, type(r) as relationship, count(DISTINCT member) as memberCount, count(DISTINCT event) as eventCount
-                ORDER BY o.name
-                RETURN o, relationship, memberCount, eventCount";
-
-            var cursor = await tx.RunAsync(query, new { userId });
-            var organizations = new List<OrganizationModel>();
-
-            await foreach (var record in cursor)
-            {
-                var node = record["o"].As<INode>();
-                var props = node.Properties;
-                var relationship = record["relationship"].As<string>();
-
-                organizations.Add(new OrganizationModel
-                {
-                    Id = node.Id,
-                    Name = props["name"].As<string>(),
-                    Slug = props["slug"].As<string>(),
-                    Description = props["description"].As<string>(),
-                    LogoUrl = props.ContainsKey("logoUrl") ? props["logoUrl"].As<string?>() : null,
-                    MemberCount = record["memberCount"].As<int>(),
-                    EventCount = record["eventCount"].As<int>(),
-                    IsUserAdmin = relationship == "ADMIN_OF",
-                    IsUserMember = true,
-                    CreatedDate = props["createdDate"].As<ZonedDateTime>().ToDateTimeOffset().DateTime
-                });
-            }
-
-            return organizations;
-        });
+            m.IsUserAdmin = adminOrgIds.Contains(m.Id!.Value);
+            m.IsUserMember = true;
+        }
+        return models;
     }
 
-    /// <summary>
-    /// Add member to organization
-    /// </summary>
     public async Task<bool> AddMemberAsync(long organizationId, string userId, string role = "Member")
     {
-        await using var session = _driver.AsyncSession();
-
-        return await session.ExecuteWriteAsync(async tx =>
-        {
-            var query = @"
-                MATCH (o:Organization), (u:User {userId: $userId})
-                WHERE id(o) = $orgId
-                MERGE (u)-[r:MEMBER_OF {role: $role, joinedDate: $joinedDate}]->(o)
-                RETURN r";
-
-            var cursor = await tx.RunAsync(query, new
-            {
-                orgId = organizationId,
-                userId,
-                role,
-                joinedDate = DateTime.UtcNow
-            });
-
-            return await cursor.FetchAsync();
-        });
+        if (!await db.Users.AnyAsync(u => u.UserId == userId)) db.Users.Add(new User { UserId = userId });
+        var row = await db.OrganizationMembers.FindAsync(userId, organizationId);
+        if (row is null)
+            db.OrganizationMembers.Add(new OrganizationMember { OrganizationId = organizationId, UserId = userId, Role = role, JoinedDate = DateTimeOffset.UtcNow });
+        else row.Role = role;
+        await db.SaveChangesAsync();
+        return true;
     }
 
-    /// <summary>
-    /// Remove member from organization
-    /// </summary>
-    public async Task<bool> RemoveMemberAsync(long organizationId, string userId)
-    {
-        await using var session = _driver.AsyncSession();
+    public async Task<bool> RemoveMemberAsync(long organizationId, string userId) =>
+        await db.OrganizationMembers.Where(m => m.OrganizationId == organizationId && m.UserId == userId).ExecuteDeleteAsync() > 0;
 
-        return await session.ExecuteWriteAsync(async tx =>
-        {
-            var query = @"
-                MATCH (u:User {userId: $userId})-[r:MEMBER_OF]->(o:Organization)
-                WHERE id(o) = $orgId
-                DELETE r
-                RETURN count(r) as deleted";
-
-            var cursor = await tx.RunAsync(query, new { orgId = organizationId, userId });
-            var record = await cursor.SingleAsync();
-            return record["deleted"].As<int>() > 0;
-        });
-    }
-
-    /// <summary>
-    /// Get organization members
-    /// </summary>
     public async Task<List<OrganizationMemberModel>> GetOrganizationMembersAsync(long organizationId)
     {
-        await using var session = _driver.AsyncSession();
-
-        return await session.ExecuteReadAsync(async tx =>
-        {
-            var query = @"
-                MATCH (u:User)-[r:ADMIN_OF|MEMBER_OF]->(o:Organization)
-                WHERE id(o) = $orgId
-                OPTIONAL MATCH (u)-[:CREATED]->(gw:GoodWork)-[:POSTED_BY]->(o)
-                WITH u, r, count(DISTINCT gw) as eventCount
-                RETURN u, type(r) as relationship, 
-                       CASE WHEN type(r) = 'ADMIN_OF' THEN r.since ELSE r.joinedDate END as joinedDate,
-                       CASE WHEN type(r) = 'ADMIN_OF' THEN 'Admin' ELSE coalesce(r.role, 'Member') END as role,
-                       eventCount
-                ORDER BY type(r) DESC, joinedDate ASC";
-
-            var cursor = await tx.RunAsync(query, new { orgId = organizationId });
-            var members = new List<OrganizationMemberModel>();
-
-            await foreach (var record in cursor)
+        var admins = await db.OrganizationAdmins.Where(a => a.OrganizationId == organizationId)
+            .Select(a => new OrganizationMemberModel
             {
-                var node = record["u"].As<INode>();
-                var props = node.Properties;
+                UserId = a.UserId, Name = a.User.Name ?? "Unknown", Email = a.User.Email ?? "",
+                Phone = a.User.Phone, Role = "Admin", JoinedDate = a.Since.UtcDateTime,
+            }).ToListAsync();
+        var members = await db.OrganizationMembers.Where(m => m.OrganizationId == organizationId)
+            .Select(m => new OrganizationMemberModel
+            {
+                UserId = m.UserId, Name = m.User.Name ?? "Unknown", Email = m.User.Email ?? "",
+                Phone = m.User.Phone, Role = m.Role, JoinedDate = m.JoinedDate.UtcDateTime,
+            }).ToListAsync();
 
-                members.Add(new OrganizationMemberModel
-                {
-                    UserId = props["userId"].As<string>(),
-                    Name = props.ContainsKey("name") ? props["name"].As<string>() : "Unknown",
-                    Email = props.ContainsKey("email") ? props["email"].As<string>() : "",
-                    Phone = props.ContainsKey("phone") ? props["phone"].As<string?>() : null,
-                    Role = record["role"].As<string>(),
-                    JoinedDate = record["joinedDate"].As<ZonedDateTime>().ToDateTimeOffset().DateTime,
-                    ContributedEvents = record["eventCount"].As<int>()
-                });
-            }
-
-            return members;
-        });
+        // ContributedEvents came from a (u)-[:CREATED]->(gw)-[:POSTED_BY]->(o) path; the CREATED edge
+        // was never written, so this was always 0. Preserved. (One line to enable via GoodWork.CreatedBy.)
+        var all = admins.Concat(members.Where(m => admins.All(a => a.UserId != m.UserId)));
+        return all.OrderByDescending(x => x.Role == "Admin").ThenBy(x => x.JoinedDate).ToList();
     }
 
-    /// <summary>
-    /// Update organization
-    /// </summary>
     public async Task<bool> UpdateOrganizationAsync(OrganizationModel organization)
     {
-        await using var session = _driver.AsyncSession();
-
-        return await session.ExecuteWriteAsync(async tx =>
-        {
-            organization.LastModifiedDate = DateTime.UtcNow;
-
-            var query = @"
-                MATCH (o:Organization)
-                WHERE id(o) = $id
-                SET o.name = $name,
-                    o.description = $description,
-                    o.mission = $mission,
-                    o.vision = $vision,
-                    o.contactEmail = $contactEmail,
-                    o.contactPhone = $contactPhone,
-                    o.website = $website,
-                    o.address = $address,
-                    o.city = $city,
-                    o.state = $state,
-                    o.country = $country,
-                    o.zipCode = $zipCode,
-                    o.latitude = $latitude,
-                    o.longitude = $longitude,
-                    o.location = point({latitude: $latitude, longitude: $longitude}),
-                    o.organizationType = $organizationType,
-                    o.logoUrl = $logoUrl,
-                    o.coverImageUrl = $coverImageUrl,
-                    o.facebookUrl = $facebookUrl,
-                    o.twitterUrl = $twitterUrl,
-                    o.instagramUrl = $instagramUrl,
-                    o.linkedInUrl = $linkedInUrl,
-                    o.focusAreas = $focusAreas,
-                    o.tags = $tags,
-                    o.lastModifiedDate = $lastModifiedDate
-                RETURN o";
-
-            var cursor = await tx.RunAsync(query, new
-            {
-                id = organization.Id,
-                name = organization.Name,
-                description = organization.Description,
-                mission = organization.Mission,
-                vision = organization.Vision,
-                contactEmail = organization.ContactEmail,
-                contactPhone = organization.ContactPhone,
-                website = organization.Website,
-                address = organization.Address,
-                city = organization.City,
-                state = organization.State,
-                country = organization.Country,
-                zipCode = organization.ZipCode,
-                latitude = organization.Latitude,
-                longitude = organization.Longitude,
-                organizationType = organization.OrganizationType,
-                logoUrl = organization.LogoUrl,
-                coverImageUrl = organization.CoverImageUrl,
-                facebookUrl = organization.FacebookUrl,
-                twitterUrl = organization.TwitterUrl,
-                instagramUrl = organization.InstagramUrl,
-                linkedInUrl = organization.LinkedInUrl,
-                focusAreas = organization.FocusAreas,
-                tags = organization.Tags,
-                lastModifiedDate = organization.LastModifiedDate
-            });
-
-            return await cursor.FetchAsync();
-        });
+        var o = await db.Organizations.FindAsync(organization.Id);
+        if (o is null) return false;
+        organization.LastModifiedDate = DateTime.UtcNow;
+        // NOTE: taxId, foundedDate, isVerified are intentionally NOT updated (matches old Cypher).
+        o.Name = organization.Name;
+        o.Description = organization.Description;
+        o.Mission = organization.Mission;
+        o.Vision = organization.Vision;
+        o.ContactEmail = organization.ContactEmail;
+        o.ContactPhone = organization.ContactPhone;
+        o.Website = organization.Website;
+        o.Address = organization.Address;
+        o.City = organization.City;
+        o.State = organization.State;
+        o.Country = organization.Country;
+        o.ZipCode = organization.ZipCode;
+        o.Latitude = organization.Latitude;
+        o.Longitude = organization.Longitude;
+        o.OrganizationType = organization.OrganizationType;
+        o.LogoUrl = organization.LogoUrl;
+        o.CoverImageUrl = organization.CoverImageUrl;
+        o.FacebookUrl = organization.FacebookUrl;
+        o.TwitterUrl = organization.TwitterUrl;
+        o.InstagramUrl = organization.InstagramUrl;
+        o.LinkedInUrl = organization.LinkedInUrl;
+        o.FocusAreas = organization.FocusAreas ?? new();
+        o.Tags = organization.Tags ?? new();
+        o.LastModifiedDate = ToDto(organization.LastModifiedDate);
+        await db.SaveChangesAsync();
+        return true;
     }
 
-    /// <summary>
-    /// Delete organization (soft delete - set status to Inactive)
-    /// </summary>
     public async Task<bool> DeleteOrganizationAsync(long organizationId)
     {
-        await using var session = _driver.AsyncSession();
-
-        return await session.ExecuteWriteAsync(async tx =>
-        {
-            var query = @"
-                MATCH (o:Organization)
-                WHERE id(o) = $id
-                SET o.status = 'Inactive'
-                RETURN o";
-
-            var cursor = await tx.RunAsync(query, new { id = organizationId });
-            return await cursor.FetchAsync();
-        });
+        var o = await db.Organizations.FindAsync(organizationId);
+        if (o is null) return false;
+        o.Status = "Inactive";
+        await db.SaveChangesAsync();
+        return true;
     }
 
-    /// <summary>
-    /// Check if user is admin of organization
-    /// </summary>
-    public async Task<bool> IsUserAdminAsync(long organizationId, string userId)
+    public async Task<bool> IsUserAdminAsync(long organizationId, string userId) =>
+        await db.OrganizationAdmins.AnyAsync(a => a.OrganizationId == organizationId && a.UserId == userId);
+
+    // Test-data helpers (were inline Cypher in TestDataService). Org tags are a text[] column.
+    public async Task<int> DeleteByTagAsync(string marker)
     {
-        await using var session = _driver.AsyncSession();
-
-        return await session.ExecuteReadAsync(async tx =>
-        {
-            var query = @"
-                MATCH (u:User {userId: $userId})-[r:ADMIN_OF]->(o:Organization)
-                WHERE id(o) = $orgId
-                RETURN count(r) > 0 as isAdmin";
-
-            var cursor = await tx.RunAsync(query, new { orgId = organizationId, userId });
-            var record = await cursor.SingleAsync();
-            return record["isAdmin"].As<bool>();
-        });
+        var ids = await db.Organizations.Where(o => o.Tags.Contains(marker)).Select(o => o.Id).ToListAsync();
+        await db.Organizations.Where(o => ids.Contains(o.Id)).ExecuteDeleteAsync();
+        return ids.Count;
     }
 
-    /// <summary>
-    /// Promote member to admin
-    /// </summary>
+    public Task<int> CountByTagAsync(string marker) =>
+        db.Organizations.CountAsync(o => o.Tags.Contains(marker));
+
     public async Task<bool> PromoteToAdminAsync(long organizationId, string userId)
     {
-        await using var session = _driver.AsyncSession();
-
-        return await session.ExecuteWriteAsync(async tx =>
+        await db.OrganizationMembers.Where(m => m.OrganizationId == organizationId && m.UserId == userId).ExecuteDeleteAsync();
+        if (!await db.OrganizationAdmins.AnyAsync(a => a.OrganizationId == organizationId && a.UserId == userId))
         {
-            // Remove existing membership relationship
-            await tx.RunAsync(@"
-                MATCH (u:User {userId: $userId})-[r:MEMBER_OF]->(o:Organization)
-                WHERE id(o) = $orgId
-                DELETE r", new { orgId = organizationId, userId });
+            if (!await db.Users.AnyAsync(u => u.UserId == userId)) db.Users.Add(new User { UserId = userId });
+            db.OrganizationAdmins.Add(new OrganizationAdmin { OrganizationId = organizationId, UserId = userId, Since = DateTimeOffset.UtcNow });
+            await db.SaveChangesAsync();
+        }
+        return true;
+    }
 
-            // Create admin relationship
-            var query = @"
-                MATCH (u:User {userId: $userId}), (o:Organization)
-                WHERE id(o) = $orgId
-                MERGE (u)-[r:ADMIN_OF {since: $since}]->(o)
-                RETURN r";
+    // ---- mapping helpers ----
+    private async Task<List<OrganizationModel>> WithCounts(List<Organization> orgs)
+    {
+        var result = new List<OrganizationModel>();
+        foreach (var o in orgs)
+        {
+            var m = MapFull(o);
+            m.MemberCount = await db.OrganizationMembers.CountAsync(x => x.OrganizationId == o.Id)
+                            + await db.OrganizationAdmins.CountAsync(x => x.OrganizationId == o.Id);
+            m.EventCount = await db.GoodWorks.CountAsync(g => g.OrganizationId == o.Id);
+            result.Add(m);
+        }
+        return result;
+    }
 
-            var cursor = await tx.RunAsync(query, new
-            {
-                orgId = organizationId,
-                userId,
-                since = DateTime.UtcNow
-            });
+    private static OrganizationModel MapFull(Organization o) => new()
+    {
+        Id = o.Id, Name = o.Name, Slug = o.Slug, Description = o.Description, Mission = o.Mission, Vision = o.Vision,
+        ContactEmail = o.ContactEmail, ContactPhone = o.ContactPhone, Website = o.Website, Address = o.Address,
+        City = o.City, State = o.State, Country = o.Country, ZipCode = o.ZipCode, Latitude = o.Latitude, Longitude = o.Longitude,
+        OrganizationType = o.OrganizationType, TaxId = o.TaxId, FoundedDate = FromDto(o.FoundedDate),
+        LogoUrl = o.LogoUrl, CoverImageUrl = o.CoverImageUrl, FacebookUrl = o.FacebookUrl, TwitterUrl = o.TwitterUrl,
+        InstagramUrl = o.InstagramUrl, LinkedInUrl = o.LinkedInUrl,
+        FocusAreas = o.FocusAreas.Count == 0 ? null : o.FocusAreas, Tags = o.Tags.Count == 0 ? null : o.Tags,
+        CreatedBy = o.CreatedBy ?? "", CreatedDate = o.CreatedDate.UtcDateTime, LastModifiedDate = FromDto(o.LastModifiedDate),
+        Status = o.Status, IsVerified = o.IsVerified,
+    };
 
-            return await cursor.FetchAsync();
-        });
+    private static void ApplyAll(OrganizationModel m, Organization o)
+    {
+        o.Name = m.Name; o.Slug = m.Slug; o.Description = m.Description; o.Mission = m.Mission; o.Vision = m.Vision;
+        o.ContactEmail = m.ContactEmail; o.ContactPhone = m.ContactPhone; o.Website = m.Website; o.Address = m.Address;
+        o.City = m.City; o.State = m.State; o.Country = m.Country; o.ZipCode = m.ZipCode; o.Latitude = m.Latitude; o.Longitude = m.Longitude;
+        o.OrganizationType = m.OrganizationType; o.TaxId = m.TaxId; o.FoundedDate = ToDto(m.FoundedDate);
+        o.LogoUrl = m.LogoUrl; o.CoverImageUrl = m.CoverImageUrl; o.FacebookUrl = m.FacebookUrl; o.TwitterUrl = m.TwitterUrl;
+        o.InstagramUrl = m.InstagramUrl; o.LinkedInUrl = m.LinkedInUrl;
+        o.FocusAreas = m.FocusAreas ?? new(); o.Tags = m.Tags ?? new();
+        o.CreatedBy = m.CreatedBy; o.CreatedDate = new DateTimeOffset(DateTime.SpecifyKind(m.CreatedDate, DateTimeKind.Utc));
+        o.LastModifiedDate = ToDto(m.LastModifiedDate); o.Status = m.Status; o.IsVerified = m.IsVerified;
     }
 }

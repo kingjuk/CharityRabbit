@@ -6,12 +6,12 @@ namespace CharityRabbit.Data;
 
 public class TestDataService
 {
-    private readonly Neo4jService _neo4jService;
+    private readonly GoodWorksService _neo4jService;
     private readonly OrganizationService _organizationService;
     private readonly IWebHostEnvironment _environment;
     private const string TEST_DATA_MARKER = "TEST_DATA";
 
-    public TestDataService(Neo4jService neo4jService, OrganizationService organizationService, IWebHostEnvironment environment)
+    public TestDataService(GoodWorksService neo4jService, OrganizationService organizationService, IWebHostEnvironment environment)
     {
         _neo4jService = neo4jService;
         _organizationService = organizationService;
@@ -346,17 +346,8 @@ public class TestDataService
 
     private async Task CreateGoodWorkOrganizationRelationship(long goodWorkId, long organizationId)
     {
-        // This creates the POSTED_BY relationship in Neo4j
-        var query = @"
-            MATCH (g:GoodWork), (o:Organization)
-            WHERE id(g) = $goodWorkId AND id(o) = $organizationId
-            MERGE (g)-[:POSTED_BY]->(o)";
-
-        await using var session = _neo4jService.GetSession();
-        await session.ExecuteWriteAsync(async tx =>
-        {
-            await tx.RunAsync(query, new { goodWorkId, organizationId });
-        });
+        // Was the POSTED_BY relationship; now the good_work.organization_id FK.
+        await _neo4jService.SetGoodWorkOrganizationAsync(goodWorkId, organizationId);
     }
 
     public async Task<int> DeleteAllTestDataAsync()
@@ -371,26 +362,8 @@ public class TestDataService
         return deletedGoodWorks + deletedOrgs;
     }
 
-    private async Task<int> DeleteTestOrganizationsAsync()
-    {
-        // Delete all organizations tagged with TEST_DATA
-        var query = @"
-            MATCH (o:Organization)
-            WHERE $testMarker IN o.tags
-            OPTIONAL MATCH (o)-[r]-()
-            DELETE r, o
-            RETURN count(DISTINCT o) as deletedCount";
-
-        await using var session = _neo4jService.GetSession();
-        var result = await session.ExecuteWriteAsync(async tx =>
-        {
-            var cursor = await tx.RunAsync(query, new { testMarker = TEST_DATA_MARKER });
-            var record = await cursor.SingleAsync();
-            return record["deletedCount"].As<int>();
-        });
-
-        return result;
-    }
+    private Task<int> DeleteTestOrganizationsAsync() =>
+        _organizationService.DeleteByTagAsync(TEST_DATA_MARKER);
 
     public async Task<List<GoodWorksModel>> GetTestDataPreviewAsync()
     {
@@ -417,21 +390,6 @@ public class TestDataService
         return goodWorksCount + orgsCount;
     }
 
-    private async Task<int> CountTestOrganizationsAsync()
-    {
-        var query = @"
-            MATCH (o:Organization)
-            WHERE $testMarker IN o.tags
-            RETURN count(o) as count";
-
-        await using var session = _neo4jService.GetSession();
-        var result = await session.ExecuteReadAsync(async tx =>
-        {
-            var cursor = await tx.RunAsync(query, new { testMarker = TEST_DATA_MARKER });
-            var record = await cursor.SingleAsync();
-            return record["count"].As<int>();
-        });
-
-        return result;
-    }
+    private Task<int> CountTestOrganizationsAsync() =>
+        _organizationService.CountByTagAsync(TEST_DATA_MARKER);
 }

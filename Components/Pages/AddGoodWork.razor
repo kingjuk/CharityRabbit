@@ -10,7 +10,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Neo4j.Driver
 
-@inject Neo4jService _neo4jService
+@inject GoodWorksService _neo4jService
 @inject OrganizationService _organizationService
 @inject GooglePlacesService _googlePlacesService
 @inject GeocodingService _geoCodingServices
@@ -641,18 +641,8 @@
 
     private async Task CreateGoodWorkOrganizationRelationship(long goodWorkId, long organizationId)
     {
-        Console.WriteLine($"DEBUG: Creating POSTED_BY relationship - GoodWork ID: {goodWorkId}, Organization ID: {organizationId}");
-        
-        var query = @"
-            MATCH (g:GoodWork), (o:Organization)
-            WHERE id(g) = $goodWorkId AND id(o) = $organizationId
-            MERGE (g)-[:POSTED_BY]->(o)
-            RETURN count(*) as count";
-
-        await using var session = _neo4jService.GetSession();
-        await session.RunAsync(query, new { goodWorkId, organizationId });
-        
-        Console.WriteLine($"DEBUG: POSTED_BY relationship created successfully");
+        // Was the POSTED_BY relationship; now the good_work.organization_id FK.
+        await _neo4jService.SetGoodWorkOrganizationAsync(goodWorkId, organizationId);
     }
 
     private void RemoveSkill(string skill)

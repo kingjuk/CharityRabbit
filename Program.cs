@@ -6,6 +6,7 @@ using GoogleMapsComponents;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MLS.Api.Services;
 using MudBlazor.Services;
@@ -28,30 +29,20 @@ internal class Program
 
         builder.Services.AddHttpContextAccessor();
 
+        // Neo4jSettings retained only for the one-shot data-copy tool (see Neo4jToPostgresMigrator).
         builder.Services.Configure<Neo4jSettings>(builder.Configuration.GetSection("Neo4jSettings"));
 
-        // Register IDriver as singleton
-        builder.Services.AddSingleton<IDriver>(sp =>
-        {
-            var neo4jSettings = sp.GetRequiredService<IOptions<Neo4jSettings>>().Value;
-            return GraphDatabase.Driver(neo4jSettings.Uri, AuthTokens.Basic(neo4jSettings.Username, neo4jSettings.Password));
-        });
-
-        builder.Services.AddSingleton<Neo4jService>(sp =>
-        {
-            var driver = sp.GetRequiredService<IDriver>();
-            var locationServices = sp.GetRequiredService<GeocodingService>();
-            return new Neo4jService(driver, locationServices);
-        });
+        builder.Services.AddDbContext<CharityDbContext>(o =>
+            o.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
 
         builder.Services.AddHttpClient<GeocodingService>();
         builder.Services.AddSingleton<GooglePlacesService>();
+        builder.Services.AddScoped<GoodWorksService>();
         builder.Services.AddScoped<TestDataService>();
         builder.Services.AddScoped<RecurringEventService>();
         builder.Services.AddScoped<SeoService>();
         builder.Services.AddScoped<OrganizationService>();
         builder.Services.AddScoped<SkillService>();
-        builder.Services.AddScoped<GraphExplorerService>();
 
         var googleMapsApiKey = builder.Configuration["GoogleMaps:ApiKey"] ?? throw new InvalidOperationException("GoogleMaps API key is missing in configuration.");
 
@@ -154,15 +145,22 @@ internal class Program
         // Initialize predefined skills and database indexes on startup
         using (var scope = app.Services.CreateScope())
         {
+            var db = scope.ServiceProvider.GetRequiredService<CharityDbContext>();
+            db.Database.Migrate();
+
+            if (args.Contains("migrate-neo4j"))
+            {
+                var settings = scope.ServiceProvider.GetRequiredService<IOptions<Neo4jSettings>>().Value;
+                await Neo4jToPostgresMigrator.RunAsync(settings, db);
+                Console.WriteLine("neo4j → Postgres copy complete.");
+                return;
+            }
+
             try
             {
                 var skillService = scope.ServiceProvider.GetRequiredService<SkillService>();
                 await skillService.InitializePredefinedSkillsAsync();
                 Console.WriteLine("Predefined skills initialized successfully");
-
-                var neo4jService = scope.ServiceProvider.GetRequiredService<Neo4jService>();
-                await neo4jService.InitializeDatabaseAsync();
-                Console.WriteLine("Database indexes initialized successfully");
             }
             catch (Exception ex)
             {
@@ -171,7 +169,7 @@ internal class Program
         }
 
         // SEO: Sitemap endpoint
-        app.MapGet("/sitemap.xml", async (Neo4jService neo4jService, SeoService seoService) =>
+        app.MapGet("/sitemap.xml", async (GoodWorksService neo4jService, SeoService seoService) =>
         {
             var goodWorks = await neo4jService.SearchGoodWorksAsync(new GoodWorksSearchCriteria(), null);
             var sitemap = await seoService.GenerateSitemapXml(goodWorks);
