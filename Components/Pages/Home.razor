@@ -89,7 +89,8 @@
         </MudCarousel>
     </MudPaper>
     <!-- Welcome Hero Section -->
-    <MudPaper Elevation="4" Class="pa-6 mb-4 text-center" color: white;">
+    <MudPaper Elevation="4" Class="pa-6 mb-4 text-center"
+              Style="background: linear-gradient(135deg, #FFA726 0%, #FF9800 100%); color: white;">
         <MudText Typo="Typo.h3" Class="mb-2">
             @if (isAuthenticated && !string.IsNullOrEmpty(userName))
             {
@@ -115,6 +116,13 @@
             </MudButton>
         }
     </MudPaper>
+
+    @if (loadError is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="() => loadError = null">
+            Something went wrong loading your personalized content. Try reloading the page.
+        </MudAlert>
+    }
 
     @if (isAuthenticated)
     {
@@ -421,6 +429,7 @@
     private bool isAuthenticated = false;
     private string? userId;
     private string? userName;
+    private string? loadError;
     
     // User stats
     private int signedUpCount = 0;
@@ -485,7 +494,10 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading personalized content: {ex.Message}");
+            // Surface to the user as well as the log — a silent catch here hid a query-translation
+            // crash for days (profile Include bug, July 2026).
+            Console.WriteLine($"Error loading personalized content: {ex}");
+            loadError = ex.Message;
         }
     }
     

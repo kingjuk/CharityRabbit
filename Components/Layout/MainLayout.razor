@@ -7,17 +7,19 @@
 <MudLayout>
     <MudAppBar Elevation="1">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
-        <MudImage Src="images/charityrabbitwhite.png" Alt="Charity Rabbit Logo" Height="50" />
-
-        <MudText Typo="Typo.h5" Class="ml-3">Charity Rabbit</MudText>
+        <MudLink Href="/" Underline="Underline.None" Color="Color.Inherit" Class="d-flex align-center">
+            <MudImage Src="images/charityrabbitwhite.png" Alt="Charity Rabbit Logo" Height="50" />
+            <MudText Typo="Typo.h5" Class="ml-3">Charity Rabbit</MudText>
+        </MudLink>
 
         <MudSpacer />
-        <MudSwitch @bind-Value="_isDarkMode" Color="Color.Primary" Class="ma-4" T="bool" Label="Toggle Light/Dark Mode" />
-
-@*         <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Color="Color.Inherit" Edge="Edge.End" />
- *@    
-</MudAppBar>
-    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <MudTooltip Text="@(_isDarkMode ? "Switch to light mode" : "Switch to dark mode")">
+            <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit" OnClick="@(() => _isDarkMode = !_isDarkMode)" />
+        </MudTooltip>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2"
+               Breakpoint="Breakpoint.Md" Variant="@DrawerVariant.Responsive">
         <NavMenu />
     </MudDrawer>
     <MudMainContent Class="mt-16 pa-4">

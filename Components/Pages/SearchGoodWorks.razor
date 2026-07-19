@@ -125,9 +125,23 @@
                         else if (!searchResults.Any())
                         {
                             <MudPaper Elevation="0" Class="pa-4 text-center">
-                                <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="MudBlazor.Size.Large" Color="Color.Secondary" />
-                                <MudText Typo="Typo.h6" Class="mt-2">No results found</MudText>
-                                <MudText Typo="Typo.body2">Try adjusting your search criteria</MudText>
+                                @if (HasActiveFilters)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="MudBlazor.Size.Large" Color="Color.Secondary" />
+                                    <MudText Typo="Typo.h6" Class="mt-2">No results found</MudText>
+                                    <MudText Typo="Typo.body2">Try adjusting your search criteria</MudText>
+                                    <MudButton Class="mt-3" Variant="Variant.Outlined" Color="Color.Primary" OnClick="ClearFilters">Clear Filters</MudButton>
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.VolunteerActivism" Size="MudBlazor.Size.Large" Color="Color.Primary" />
+                                    <MudText Typo="Typo.h6" Class="mt-2">No good works posted yet</MudText>
+                                    <MudText Typo="Typo.body2">Be the first to organize a volunteer opportunity in your community!</MudText>
+                                    <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Add" Href="/add-good-work">
+                                        Create the First Good Work
+                                    </MudButton>
+                                }
                             </MudPaper>
                         }
                         else
@@ -495,6 +509,12 @@
     private double searchRadius = 20; // Changed default to 20 miles
     private bool availableSpotsOnly = false;
     private List<string> selectedSkills = new();
+
+    private bool HasActiveFilters =>
+        !string.IsNullOrEmpty(searchCriteria.Category) || selectedSkills.Any()
+        || startDateFrom.HasValue || startDateTo.HasValue || !string.IsNullOrEmpty(zipCode)
+        || searchCriteria.IsVirtual == true || searchCriteria.IsAccessible == true
+        || searchCriteria.FamilyFriendly == true || availableSpotsOnly;
     private string? selectedSkillFilter;
 
     // Map fields
