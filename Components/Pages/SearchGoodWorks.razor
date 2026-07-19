@@ -510,9 +510,15 @@
     private bool availableSpotsOnly = false;
     private List<string> selectedSkills = new();
 
+    // The initial page load auto-sets a date window (LoadUpcomingEvents), so only count dates
+    // as "user filtering" when they deviate from that baseline.
+    private DateTime? autoLoadDateFrom;
+    private DateTime? autoLoadDateTo;
+
     private bool HasActiveFilters =>
         !string.IsNullOrEmpty(searchCriteria.Category) || selectedSkills.Any()
-        || startDateFrom.HasValue || startDateTo.HasValue || !string.IsNullOrEmpty(zipCode)
+        || startDateFrom != autoLoadDateFrom || startDateTo != autoLoadDateTo
+        || !string.IsNullOrEmpty(zipCode)
         || searchCriteria.IsVirtual == true || searchCriteria.IsAccessible == true
         || searchCriteria.FamilyFriendly == true || availableSpotsOnly;
     private string? selectedSkillFilter;
@@ -690,6 +696,8 @@
         // Set date range to next 3 months
         startDateFrom = DateTime.Today.Subtract(TimeSpan.FromDays(10));
         startDateTo = DateTime.Today.AddMonths(3);
+        autoLoadDateFrom = startDateFrom;
+        autoLoadDateTo = startDateTo;
 
         searchCriteria.StartDateFrom = startDateFrom;
         searchCriteria.StartDateTo = startDateTo;
