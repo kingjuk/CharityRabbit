@@ -231,14 +231,15 @@ public class GoodWorksService(CharityDbContext db, GeocodingService locationServ
         }
     }
 
+    // Note: Include() can't follow a Select() projection — filter GoodWorks via the join table instead.
     public Task<List<GoodWorksModel>> GetUserInterestedGoodWorksAsync(string userId) =>
-        db.Interested.Where(x => x.UserId == userId)
-            .Select(x => x.GoodWork).Include(g => g.Contact).Include(g => g.Location)
+        db.GoodWorks.Where(g => db.Interested.Any(x => x.UserId == userId && x.GoodWorkId == g.Id))
+            .Include(g => g.Contact).Include(g => g.Location)
             .OrderBy(g => g.StartTime).ToListAsync().ContinueWith(t => t.Result.Select(Map).ToList());
 
     public Task<List<GoodWorksModel>> GetUserSignedUpGoodWorksAsync(string userId) =>
-        db.Signups.Where(x => x.UserId == userId)
-            .Select(x => x.GoodWork).Include(g => g.Contact).Include(g => g.Location)
+        db.GoodWorks.Where(g => db.Signups.Any(x => x.UserId == userId && x.GoodWorkId == g.Id))
+            .Include(g => g.Contact).Include(g => g.Location)
             .OrderBy(g => g.StartTime).ToListAsync().ContinueWith(t => t.Result.Select(Map).ToList());
 
     public async Task<List<GoodWorksModel>> GetUserCreatedGoodWorksAsync(string userId)
