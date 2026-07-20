@@ -1,0 +1,22 @@
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+@* Share via the native share sheet (mobile) or clipboard copy (desktop). Pages with
+   Open Graph metadata unfurl with title/description when the link is shared. *@
+<MudTooltip Text="Share">
+    <MudIconButton Icon="@Icons.Material.Filled.Share" Size="@Size" Color="Color.Primary" OnClick="ShareAsync" />
+</MudTooltip>
+
+@code {
+    [Parameter] public string Title { get; set; } = "CharityRabbit";
+    [Parameter] public string Text { get; set; } = "";
+    [Parameter] public string Url { get; set; } = "";
+    [Parameter] public Size Size { get; set; } = Size.Medium;
+
+    private async Task ShareAsync()
+    {
+        var result = await JS.InvokeAsync<string>("charityRabbitShare", Title, Text, Url);
+        if (result == "copied")
+            Snackbar.Add("Link copied to clipboard — paste it anywhere!", Severity.Success);
+    }
+}

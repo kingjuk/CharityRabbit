@@ -15,6 +15,15 @@
 {
     <HeadContent>
         <meta name="description" content="@organization.Description" />
+        <link rel="canonical" href="@($"https://charityrabbit.com/organizations/{Slug}")" />
+        <meta property="og:title" content="@($"{organization.Name} - CharityRabbit")" />
+        <meta property="og:description" content="@organization.Description" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="@($"https://charityrabbit.com/organizations/{Slug}")" />
+        @if (!string.IsNullOrEmpty(organization.LogoUrl))
+        {
+            <meta property="og:image" content="@organization.LogoUrl" />
+        }
     </HeadContent>
 }
 
@@ -56,12 +65,15 @@
                 <MudItem xs="12" md="10">
                     <div class="d-flex justify-space-between align-center">
                         <div>
-                            <MudText Typo="Typo.h3">
+                            <MudText Typo="Typo.h3" Class="d-flex align-center" Style="gap: 8px;">
                                 @organization.Name
                                 @if (organization.IsVerified)
                                 {
                                     <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Primary" Title="Verified Organization" />
                                 }
+                                <ShareButton Title="@organization.Name"
+                                             Text="@($"Check out {organization.Name} on CharityRabbit — find volunteer opportunities with them:")"
+                                             Url="@($"https://charityrabbit.com/organizations/{Slug}")" />
                             </MudText>
                             <MudText Typo="Typo.body1" Color="Color.Secondary">
                                 @organization.OrganizationType

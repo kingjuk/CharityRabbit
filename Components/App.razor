@@ -15,7 +15,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />  
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
-    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="_content/MudBlazor/MudBlazor.min.css?v=@MudVersion" rel="stylesheet" />
     <ImportMap />
     <link rel="icon" type="image/ico" href="favicon.ico" />
     <HeadOutlet @rendermode="PageRenderMode" />
@@ -24,7 +24,19 @@
 <body>
     <Routes @rendermode="PageRenderMode" />
     <script src="_framework/blazor.web.js"></script>
-    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js?v=@MudVersion"></script>
+    <script>
+        // Native share sheet on mobile, clipboard fallback on desktop.
+        // Returns "shared", "copied", or "cancelled" so the caller can show the right feedback.
+        window.charityRabbitShare = async function (title, text, url) {
+            if (navigator.share) {
+                try { await navigator.share({ title: title, text: text, url: url }); return "shared"; }
+                catch { return "cancelled"; }
+            }
+            await navigator.clipboard.writeText(text + " " + url);
+            return "copied";
+        };
+    </script>
     <script src="_content/Extensions.MudBlazor.StaticInput/NavigationObserver.js"></script>
     <script src="_content/BlazorGoogleMaps/js/objectManager.js"></script>
     <script src="js/geolocation.js"></script>
@@ -36,6 +48,11 @@
 </html>
 
 @code {
+    // Cache-buster for MudBlazor static assets: the URL never changes between package versions,
+    // so returning browsers keep a stale MudBlazor.min.js and JS-interop calls blow up.
+    private static readonly string MudVersion =
+        typeof(MudBlazor.MudThemeProvider).Assembly.GetName().Version?.ToString() ?? "0";
+
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 
