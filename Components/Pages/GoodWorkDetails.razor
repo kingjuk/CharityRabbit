@@ -106,10 +106,11 @@ else
                                    Disabled="@(!isAuthenticated)">
                             @(goodWork.IsUserInterested ? "Interested" : "Mark Interested")
                         </MudButton>
+                        @* A signed-up user must always be able to un-sign-up, even when the event is full *@
                         <MudButton Color="@(goodWork.IsUserSignedUp ? Color.Success : Color.Primary)"
                                    StartIcon="@Icons.Material.Filled.CheckCircle"
                                    OnClick="ToggleSignUp"
-                                   Disabled="@(!isAuthenticated || (goodWork.MaxParticipants.HasValue && goodWork.SignedUpCount >= goodWork.MaxParticipants.Value))">
+                                   Disabled="@(!isAuthenticated || (!goodWork.IsUserSignedUp && goodWork.MaxParticipants.HasValue && goodWork.SignedUpCount >= goodWork.MaxParticipants.Value))">
                             @(goodWork.IsUserSignedUp ? "Signed Up" : "Sign Up")
                         </MudButton>
                     </MudButtonGroup>

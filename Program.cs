@@ -5,6 +5,7 @@ using CharityRabbit.Models;
 using GoogleMapsComponents;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -34,6 +35,12 @@ internal class Program
 
         builder.Services.AddDbContext<CharityDbContext>(o =>
             o.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
+
+        // Persist data-protection keys in Postgres so every deploy doesn't invalidate
+        // sessions and antiforgery tokens (keys were container-local before).
+        builder.Services.AddDataProtection()
+            .PersistKeysToDbContext<CharityDbContext>()
+            .SetApplicationName("CharityRabbit");
 
         builder.Services.AddHttpClient<GeocodingService>();
         builder.Services.AddSingleton<GooglePlacesService>();

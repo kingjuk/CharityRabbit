@@ -1,9 +1,14 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace CharityRabbit.Data;
 
-public class CharityDbContext(DbContextOptions<CharityDbContext> options) : DbContext(options)
+// IDataProtectionKeyContext: persists ASP.NET data-protection keys in the database so
+// deploys/restarts don't invalidate auth cookies and antiforgery tokens.
+public class CharityDbContext(DbContextOptions<CharityDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
     public DbSet<User> Users => Set<User>();
     public DbSet<Contact> Contacts => Set<Contact>();
     public DbSet<Location> Locations => Set<Location>();
