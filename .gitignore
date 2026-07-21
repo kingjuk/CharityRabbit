@@ -400,3 +400,7 @@ FodyWeavers.xsd
 *.sln.iml
 /appsettings.Production.json
 /docs/publish.md
+
+# MAUI build output
+CharityRabbit.Maui/bin/
+CharityRabbit.Maui/obj/

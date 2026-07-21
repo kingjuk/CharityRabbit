@@ -28,6 +28,12 @@
     </array>
     <key>XSAppIconAssets</key>
     <string>Assets.xcassets/appicon.appiconset</string>
+    <key>CFBundleName</key>
+    <string>CharityRabbit</string>
+    <key>CFBundleDisplayName</key>
+    <string>CharityRabbit</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>CharityRabbit uses your location to find volunteer opportunities near you.</string>
     <key>CFBundleURLTypes</key>

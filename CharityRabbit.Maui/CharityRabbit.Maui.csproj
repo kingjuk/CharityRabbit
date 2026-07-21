@@ -18,6 +18,11 @@
              catches up to Xcode 26.6. -->
         <ValidateXcodeVersion>false</ValidateXcodeVersion>
 
+        <!-- Keep reflection-based System.Text.Json working under the Release trimmer, so
+             System.Net.Http.Json (de)serialization of the shared Models never silently
+             breaks in a trimmed App Store build. -->
+        <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+
         <!-- Display name -->
         <ApplicationTitle>CharityRabbit</ApplicationTitle>
 
@@ -33,11 +38,11 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <!-- App Icon -->
-        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#8BC34A" />
+        <!-- App Icon: white CharityRabbit glyph on the brand green (opaque bg → App Store compliant). -->
+        <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\charityrabbit_fg.png" Color="#8BC34A" ForegroundScale="0.62" />
 
         <!-- Splash Screen -->
-        <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#8BC34A" BaseSize="128,128" />
+        <MauiSplashScreen Include="Resources\Splash\charityrabbit_splash.png" Color="#8BC34A" BaseSize="180,180" />
 
         <!-- Images -->
         <MauiImage Include="Resources\Images\*" />
