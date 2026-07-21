@@ -15,5 +15,12 @@ public class WebGeolocationProvider(IJSRuntime js) : IGeolocationProvider
         {
             return null;
         }
+        catch (InvalidOperationException)
+        {
+            // Thrown when called during prerendering ("component is being statically
+            // rendered"). Callers should only request location from a user gesture, but
+            // degrade instead of taking the page down if one slips through.
+            return null;
+        }
     }
 }

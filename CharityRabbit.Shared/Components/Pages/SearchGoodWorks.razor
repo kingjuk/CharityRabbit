@@ -9,6 +9,8 @@
 @inject ISkillService _skillService
 @inject IJSRuntime JSRuntime
 @inject CharityRabbit.Platform.IGeolocationProvider Geolocation
+@inject IGeocodingService _geocoding
+@inject ISnackbar Snackbar
 @inject MudBlazor.IBrowserViewportService ViewportService
 
 <PageTitle>Search Volunteer Opportunities - CharityRabbit</PageTitle>
@@ -244,10 +246,33 @@
                             }
                             else
                             {
-                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-                                    <MudIcon Icon="@Icons.Material.Filled.LocationOff" Size="MudBlazor.Size.Small" />
-                                    Location access unavailable - showing all events nationwide
-                                </MudAlert>
+                                @if (locationState == LocationState.Denied)
+                                {
+                                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                                        <MudIcon Icon="@Icons.Material.Filled.LocationOff" Size="MudBlazor.Size.Small" />
+                                        Location access was blocked. Allow it in your browser's site settings,
+                                        or use a zip code below.
+                                    </MudAlert>
+                                }
+                                else
+                                {
+                                    <MudAlert Severity="Severity.Normal" Dense="true" Class="mb-2">
+                                        Showing events nationwide. Narrow to your area:
+                                    </MudAlert>
+                                }
+
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true"
+                                           StartIcon="@Icons.Material.Filled.MyLocation" Class="mb-2"
+                                           Disabled="@(locationState == LocationState.Requesting)"
+                                           OnClick="UseMyLocationAsync">
+                                    @(locationState == LocationState.Requesting ? "Locating…" : "Use My Location")
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                                           StartIcon="@Icons.Material.Filled.Search" Class="mb-3"
+                                           Disabled="@string.IsNullOrWhiteSpace(zipCode)"
+                                           OnClick="UseZipCodeAsync">
+                                    Use Zip Code
+                                </MudButton>
                             }
 
                             <MudSelect @bind-Value="searchCriteria.Category" Label="Category" Clearable="true" Class="mb-3">
@@ -605,20 +630,79 @@
 
     private bool _filtersOpen = true;
 
+    // Location is opt-in: we never prompt on load. Browsers increasingly want geolocation
+    // tied to a user gesture, and an unprompted request trains people to dismiss it (after
+    // which the browser blocks the site permanently). The user taps "Use my location".
+    private enum LocationState { NotRequested, Requesting, Granted, Denied }
+    private LocationState locationState = LocationState.NotRequested;
+
     protected override async Task OnInitializedAsync()
     {
-        // Get user's location
-        userLocation = await TryGetUserLocation();
-
+        // NOTE: no geolocation here. On the web host this runs during prerendering, where
+        // JS interop throws ("component is being statically rendered").
         _mapOptions = new MapOptions
         {
             Zoom = 11,
-            Center = userLocation ?? new LatLngLiteral(34.7304, -86.5861),
+            Center = new LatLngLiteral(34.7304, -86.5861),
             MapTypeId = MapTypeId.Roadmap
         };
 
         // Auto-load upcoming events on page load
         await LoadUpcomingEvents();
+    }
+
+    private async Task UseMyLocationAsync()
+    {
+        locationState = LocationState.Requesting;
+        StateHasChanged();
+
+        userLocation = await TryGetUserLocation();
+        if (userLocation is null)
+        {
+            locationState = LocationState.Denied;
+            StateHasChanged();
+            return;
+        }
+
+        locationState = LocationState.Granted;
+        await CenterAndSearchAsync(userLocation.Value);
+    }
+
+    // Zip fallback so people who decline location still get local results. Uses the shared
+    // geocoding service (Google server-side on web, /api/v1/geo proxy on mobile).
+    private async Task UseZipCodeAsync()
+    {
+        if (string.IsNullOrWhiteSpace(zipCode)) return;
+
+        try
+        {
+            var point = await _geocoding.GetCoordinatesAsync(zipCode.Trim());
+            if (point is null || (point.Latitude == 0 && point.Longitude == 0))
+            {
+                Snackbar.Add($"Couldn't find a location for zip code {zipCode}.", MudBlazor.Severity.Warning);
+                return;
+            }
+
+            userLocation = new LatLngLiteral(point.Latitude, point.Longitude);
+            locationState = LocationState.Granted;
+            await CenterAndSearchAsync(userLocation.Value);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Zip geocode failed for '{zipCode}': {ex.Message}");
+            Snackbar.Add("Couldn't look up that zip code right now.", MudBlazor.Severity.Warning);
+        }
+    }
+
+    private async Task CenterAndSearchAsync(LatLngLiteral center)
+    {
+        _mapOptions = new MapOptions
+        {
+            Zoom = 11,
+            Center = center,
+            MapTypeId = MapTypeId.Roadmap
+        };
+        await PerformMapSearch();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
