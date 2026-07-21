@@ -3,15 +3,26 @@
 
 @* Share via the native share sheet (mobile) or clipboard copy (desktop). Pages with
    Open Graph metadata unfurl with title/description when the link is shared. *@
-<MudTooltip Text="Share">
-    <MudIconButton Icon="@Icons.Material.Filled.Share" Size="@Size" Color="Color.Primary" OnClick="ShareAsync" />
-</MudTooltip>
+@if (IconOnly)
+{
+    <MudTooltip Text="Share">
+        <MudIconButton Icon="@Icons.Material.Filled.Share" Size="@Size" Color="Color.Primary" OnClick="ShareAsync" />
+    </MudTooltip>
+}
+else
+{
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="@Size"
+               StartIcon="@Icons.Material.Filled.Share" OnClick="ShareAsync">
+        Share
+    </MudButton>
+}
 
 @code {
     [Parameter] public string Title { get; set; } = "CharityRabbit";
     [Parameter] public string Text { get; set; } = "";
     [Parameter] public string Url { get; set; } = "";
     [Parameter] public Size Size { get; set; } = Size.Medium;
+    [Parameter] public bool IconOnly { get; set; } = false;
 
     private async Task ShareAsync()
     {
