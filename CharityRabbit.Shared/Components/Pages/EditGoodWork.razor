@@ -2,19 +2,18 @@
 @using System.ComponentModel.DataAnnotations
 @using CharityRabbit.Data
 @using CharityRabbit.Models
-@using MLS.Api.Services
 @using GoogleMapsComponents
 @using GoogleMapsComponents.Maps
 @using MudBlazor
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
 
-@inject GoodWorksService _neo4jService
-@inject GooglePlacesService _googlePlacesService
-@inject GeocodingService _geoCodingServices
+@inject IGoodWorksService _neo4jService
+@inject IPlacesService _googlePlacesService
+@inject IGeocodingService _geoCodingServices
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject SkillService _skillService
+@inject ISkillService _skillService
 @attribute [Authorize]
 
 <PageTitle>Edit Good Work - Charity Rabbit</PageTitle>

@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 namespace CharityRabbit.Data;
 
 // Skill catalog + user skills, backed by PostgreSQL (EF Core). Public API unchanged.
-public class SkillService(CharityDbContext db)
+public class SkillService(CharityDbContext db) : ISkillService
 {
     private static string NormalizeSkillName(string name)
     {

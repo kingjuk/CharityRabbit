@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Components moved here from the web project keep their CharityRabbit.* namespaces,
+         so no @using/typeof churn in either host. -->
+    <RootNamespace>CharityRabbit</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.2" />
+    <!-- Pinned exactly (not floating) — web and MAUI hosts must resolve identical
+         MudBlazor/Maps JS+CSS or the two UIs drift. -->
+    <PackageReference Include="MudBlazor" Version="8.15.0" />
+    <PackageReference Include="Extensions.MudBlazor.StaticInput" Version="3.2.1" />
+    <PackageReference Include="BlazorGoogleMaps" Version="4.14.1" />
+  </ItemGroup>
+
+</Project>

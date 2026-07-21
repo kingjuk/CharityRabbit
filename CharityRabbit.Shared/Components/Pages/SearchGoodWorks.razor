@@ -4,10 +4,11 @@
 @using GoogleMapsComponents
 @using GoogleMapsComponents.Maps
 @using MouseEvent = GoogleMapsComponents.Maps.MouseEvent
-@inject GoodWorksService _neo4jService
+@inject IGoodWorksService _neo4jService
 @inject SeoService _seoService
-@inject SkillService _skillService
+@inject ISkillService _skillService
 @inject IJSRuntime JSRuntime
+@inject CharityRabbit.Platform.IGeolocationProvider Geolocation
 
 <PageTitle>Search Volunteer Opportunities - CharityRabbit</PageTitle>
 
@@ -662,15 +663,15 @@
     {
         try
         {
-            // Try to get user's current location from browser
-            var result = await JSRuntime.InvokeAsync<GeolocationResult?>("geolocationHelper.getCurrentPosition");
-            
+            // Try to get user's current location from the device
+            var result = await Geolocation.GetCurrentPositionAsync();
+
             if (result != null && result.Latitude != 0 && result.Longitude != 0)
             {
                 Console.WriteLine($"User location detected: {result.Latitude}, {result.Longitude}");
                 return new LatLngLiteral(result.Latitude, result.Longitude);
             }
-            
+
             Console.WriteLine("Could not get user location");
             return null;
         }
@@ -679,14 +680,6 @@
             Console.WriteLine($"Geolocation error: {ex.Message}");
             return null;
         }
-    }
-
-    // Helper class for geolocation result
-    private class GeolocationResult
-    {
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public double Accuracy { get; set; }
     }
 
     private async Task LoadUpcomingEvents()

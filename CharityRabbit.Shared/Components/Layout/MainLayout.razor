@@ -1,4 +1,5 @@
 ﻿@inherits LayoutComponentBase
+@inject CharityRabbit.Platform.NavMenuComponent NavMenu
 
 <MudThemeProvider @bind-IsDarkMode="@_isDarkMode" Theme="_theme" />
 <MudPopoverProvider />
@@ -20,7 +21,7 @@
     </MudAppBar>
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2"
                Breakpoint="Breakpoint.Md" Variant="@DrawerVariant.Responsive">
-        <NavMenu />
+        <DynamicComponent Type="NavMenu.ComponentType" />
     </MudDrawer>
     <MudMainContent Class="mt-16 pa-4">
         @Body

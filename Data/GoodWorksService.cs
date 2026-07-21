@@ -1,18 +1,17 @@
 using CharityRabbit.Models;
 using Microsoft.EntityFrameworkCore;
-using MLS.Api.Services;
 
 namespace CharityRabbit.Data;
+
+/// <summary>Projection for endpoint authorization checks (see GetOwnershipAsync).</summary>
+public sealed record GoodWorkOwnership(string? CreatedBy, long? OrganizationId);
 
 // GoodWorks (volunteer events), interest/signup, participants & recommendations — PostgreSQL (EF Core).
 // Public API identical to the former neo4j-backed service (former Neo4jService, renamed).
 // Notes: distance search uses a bounding-box approximation (no PostGIS, per decision); the CREATED and
 // FRIENDS_WITH relationships were never written in the graph, so their contributions stay zero (preserved).
-public class GoodWorksService(CharityDbContext db, GeocodingService locationServices)
+public class GoodWorksService(CharityDbContext db, IGeocodingService locationServices) : IGoodWorksService
 {
-    // Schema is applied by EF migrations at startup; kept as a no-op for call-site compatibility.
-    public Task InitializeDatabaseAsync() => Task.CompletedTask;
-
     private static DateTimeOffset? ToDto(DateTime? v) =>
         v.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(v.Value, DateTimeKind.Utc)) : null;
 
@@ -94,6 +93,13 @@ public class GoodWorksService(CharityDbContext db, GeocodingService locationServ
         await db.SaveChangesAsync();
         goodWork.Id = g.Id;
     }
+
+    /// <summary>Cheap single-row read for endpoint-level ownership/authorization checks —
+    /// avoids materializing the full aggregate (4 Includes + participation counts).</summary>
+    public Task<GoodWorkOwnership?> GetOwnershipAsync(long id) =>
+        db.GoodWorks.Where(g => g.Id == id)
+            .Select(g => new GoodWorkOwnership(g.CreatedBy, g.OrganizationId))
+            .FirstOrDefaultAsync();
 
     private IQueryable<GoodWork> GoodWorksWithDetails() =>
         db.GoodWorks.Include(g => g.Contact).Include(g => g.Location).Include(g => g.Tags).Include(g => g.Skills);
@@ -199,6 +205,8 @@ public class GoodWorksService(CharityDbContext db, GeocodingService locationServ
     {
         if (interested)
         {
+            // Guard like SignUpUserAsync: an unknown id would otherwise FK-fault on save.
+            if (!await db.GoodWorks.AnyAsync(g => g.Id == goodWorkId)) return;
             await EnsureUserAsync(userId, userName, userEmail);
             if (!await db.Interested.AnyAsync(x => x.UserId == userId && x.GoodWorkId == goodWorkId))
                 db.Interested.Add(new UserInterested { UserId = userId, GoodWorkId = goodWorkId, CreatedAt = DateTimeOffset.UtcNow });

@@ -5,21 +5,29 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-CharityRabbit-21463a38-c91d-468f-a284-a7278e0a96a2</UserSecretsId>
+    <!-- The Shared RCL lives in a subfolder of this (root-level) web project; keep its
+         sources out of this project's default globs. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);CharityRabbit.Shared/**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="CharityRabbit.Shared\CharityRabbit.Shared.csproj" />
+  </ItemGroup>
 
 
   <ItemGroup>
-    <PackageReference Include="BlazorGoogleMaps" Version="4.14.1" />
+    <!-- MudBlazor / StaticInput / BlazorGoogleMaps come transitively from
+         CharityRabbit.Shared, which pins exact versions for both hosts. -->
     <PackageReference Include="GoogleApi" Version="5.8.12" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.2" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.9">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
 
-    <PackageReference Include="MudBlazor" Version="8.*" />
-    <PackageReference Include="Extensions.MudBlazor.StaticInput" Version="3.*" />
     <PackageReference Include="Neo4j.Driver" Version="6.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />

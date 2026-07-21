@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 namespace CharityRabbit.Data;
 
 // Organizations, members/admins, backed by PostgreSQL (EF Core). Public API unchanged.
-public class OrganizationService(CharityDbContext db)
+public class OrganizationService(CharityDbContext db) : IOrganizationService
 {
     private static string GenerateSlug(string name)
     {

@@ -1,10 +1,10 @@
-﻿using Newtonsoft.Json.Linq;
-using System.Net.Http;
+using CharityRabbit.Models;
+using Newtonsoft.Json.Linq;
 using System.Text.Json;
 
-namespace MLS.Api.Services
+namespace CharityRabbit.Data
 {
-    public class GeocodingService
+    public class GeocodingService : IGeocodingService
     {
         private readonly string _apiKey;
         private readonly HttpClient _httpClient;
@@ -15,12 +15,11 @@ namespace MLS.Api.Services
             _httpClient = httpClient;
         }
 
-        public async Task<(double Latitude, double Longitude)> GetCoordinatesAsync(string address)
+        public async Task<GeoPoint> GetCoordinatesAsync(string address)
         {
             string url = $"https://maps.googleapis.com/maps/api/geocode/json?address={Uri.EscapeDataString(address)}&key={_apiKey}";
 
-            using HttpClient client = new HttpClient();
-            HttpResponseMessage response = await client.GetAsync(url);
+            HttpResponseMessage response = await _httpClient.GetAsync(url);
 
             if (response.IsSuccessStatusCode)
             {
@@ -32,7 +31,7 @@ namespace MLS.Api.Services
                     var location = json["results"][0]["geometry"]["location"];
                     double lat = (double)location["lat"];
                     double lng = (double)location["lng"];
-                    return (lat, lng);
+                    return new GeoPoint(lat, lng);
                 }
                 else
                 {
@@ -45,7 +44,7 @@ namespace MLS.Api.Services
             }
         }
 
-        public async Task<(string city, string state, string country, string zip)> GetLocationDetailsAsync(double lat, double lng)
+        public async Task<LocationDetails> GetLocationDetailsAsync(double lat, double lng)
         {
             var url = $"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={_apiKey}";
             var response = await _httpClient.GetAsync(url);
@@ -85,7 +84,7 @@ namespace MLS.Api.Services
                 }
             }
 
-            return (city, state, country, zip);
+            return new LocationDetails(city, state, country, zip);
         }
 
         private string GetComponent(JsonElement addressComponents, string type)

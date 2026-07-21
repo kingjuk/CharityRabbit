@@ -1,4 +1,4 @@
-@inject IJSRuntime JS
+@inject CharityRabbit.Platform.IShareProvider ShareProvider
 @inject ISnackbar Snackbar
 
 @* Share via the native share sheet (mobile) or clipboard copy (desktop). Pages with
@@ -26,8 +26,10 @@ else
 
     private async Task ShareAsync()
     {
-        var result = await JS.InvokeAsync<string>("charityRabbitShare", Title, Text, Url);
-        if (result == "copied")
+        var result = await ShareProvider.ShareAsync(Title, Text, Url);
+        if (result == CharityRabbit.Platform.ShareOutcome.Copied)
             Snackbar.Add("Link copied to clipboard — paste it anywhere!", Severity.Success);
+        else if (result == CharityRabbit.Platform.ShareOutcome.Failed)
+            Snackbar.Add("Couldn't share or copy the link.", Severity.Warning);
     }
 }

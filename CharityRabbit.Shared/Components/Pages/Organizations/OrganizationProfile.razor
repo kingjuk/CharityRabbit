@@ -2,9 +2,8 @@
 @using CharityRabbit.Models
 @using CharityRabbit.Data
 @using System.Security.Claims
-@using Neo4j.Driver
-@inject OrganizationService _organizationService
-@inject GoodWorksService _neo4jService
+@inject IOrganizationService _organizationService
+@inject IGoodWorksService _neo4jService
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IDialogService DialogService

@@ -1,15 +1,11 @@
-﻿using GoogleMapsComponents;
-
-namespace CharityRabbit.Data
+﻿namespace CharityRabbit.Data
 {
     using GoogleApi;
     using GoogleApi.Entities.Places.AutoComplete.Request;
-    using GoogleApi.Entities.Places.AutoComplete.Response;
-    using GoogleMapsComponents;
     using System.Collections.Generic;
     using System.Threading.Tasks;
 
-    public class GooglePlacesService
+    public class GooglePlacesService : IPlacesService
     {
         private readonly string _apiKey;
 

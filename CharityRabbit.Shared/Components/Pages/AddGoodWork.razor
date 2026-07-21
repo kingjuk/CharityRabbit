@@ -2,21 +2,20 @@
 @using System.ComponentModel.DataAnnotations
 @using CharityRabbit.Data
 @using CharityRabbit.Models
-@using MLS.Api.Services
 @using GoogleMapsComponents
 @using GoogleMapsComponents.Maps
 @using MudBlazor
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
-@using Neo4j.Driver
 
-@inject GoodWorksService _neo4jService
-@inject OrganizationService _organizationService
-@inject GooglePlacesService _googlePlacesService
-@inject GeocodingService _geoCodingServices
+@inject IGoodWorksService _neo4jService
+@inject IOrganizationService _organizationService
+@inject IPlacesService _googlePlacesService
+@inject IGeocodingService _geoCodingServices
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject SkillService _skillService
+@inject ISkillService _skillService
 @inject IJSRuntime JSRuntime
+@inject CharityRabbit.Platform.IGeolocationProvider Geolocation
 @attribute [Authorize]
 
 <PageTitle>Add Good Work - Charity Rabbit</PageTitle>
@@ -336,15 +335,15 @@
         
         try
         {
-            // Try to get user's current location from browser
-            var result = await JSRuntime.InvokeAsync<GeolocationResult?>("geolocationHelper.getCurrentPosition");
-            
+            // Try to get user's current location from the device
+            var result = await Geolocation.GetCurrentPositionAsync();
+
             if (result != null && result.Latitude != 0 && result.Longitude != 0)
             {
                 Console.WriteLine($"User location detected: {result.Latitude}, {result.Longitude}");
                 return new LatLngLiteral(result.Latitude, result.Longitude);
             }
-            
+
             Console.WriteLine("Using default location (Huntsville, AL)");
             return defaultLocation;
         }
@@ -353,14 +352,6 @@
             Console.WriteLine($"Geolocation error: {ex.Message}. Using default location.");
             return defaultLocation;
         }
-    }
-
-    // Helper class for geolocation result
-    private class GeolocationResult
-    {
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public double Accuracy { get; set; }
     }
 
     private string GetIntervalHelperText()

@@ -1,5 +1,8 @@
 ﻿@using CharityRabbit.Components.Account.Shared
-<Router AppAssembly="typeof(Program).Assembly">
+@* Routable pages live in two assemblies since the shared-RCL split: this one (Error,
+   Admin/TestData, Account) and CharityRabbit.Shared (everything else). *@
+<Router AppAssembly="typeof(Program).Assembly"
+        AdditionalAssemblies="new[] { typeof(Layout.MainLayout).Assembly }">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized>

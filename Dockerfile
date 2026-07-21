@@ -8,6 +8,7 @@ FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG TARGETARCH
 WORKDIR /src
 COPY ["CharityRabbit.csproj", ""]
+COPY ["CharityRabbit.Shared/CharityRabbit.Shared.csproj", "CharityRabbit.Shared/"]
 RUN dotnet restore "CharityRabbit.csproj" -a $TARGETARCH
 COPY . .
 WORKDIR "/src/"
