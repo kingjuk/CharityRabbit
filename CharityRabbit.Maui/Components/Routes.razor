@@ -1,0 +1,12 @@
+@* Routable pages live in the Shared RCL; this host contributes only LoginRequired. *@
+<Router AppAssembly="typeof(MauiProgram).Assembly"
+        AdditionalAssemblies="new[] { typeof(CharityRabbit.Components.Layout.MainLayout).Assembly }">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(CharityRabbit.Components.Layout.MainLayout)">
+            <NotAuthorized>
+                <CharityRabbit.Maui.Components.Pages.LoginRequired />
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

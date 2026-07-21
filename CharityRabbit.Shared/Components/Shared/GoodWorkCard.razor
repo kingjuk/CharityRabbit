@@ -1,0 +1,79 @@
+@using CharityRabbit.Models
+
+@* Compact tappable card for a volunteer opportunity — the mobile/narrow-screen
+   equivalent of one MudDataGrid row. Whole card navigates to the detail page. *@
+<MudCard Class="mb-3" Elevation="2" Style="cursor: pointer;" @onclick="Navigate">
+    <MudCardContent Class="pa-3">
+        <div class="d-flex justify-space-between align-start gap-2">
+            <MudText Typo="Typo.subtitle1" Style="font-weight: 600; line-height: 1.25;">@Item.Name</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Primary" />
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Item.Category) || Item.StartTime.HasValue)
+        {
+            <div class="d-flex flex-wrap align-center gap-3 mt-1 mud-text-secondary">
+                @if (!string.IsNullOrWhiteSpace(Item.Category))
+                {
+                    <span class="d-flex align-center"><MudIcon Icon="@Icons.Material.Filled.Category" Size="Size.Small" Class="mr-1" />@Item.Category</span>
+                }
+                @if (Item.StartTime.HasValue)
+                {
+                    <span class="d-flex align-center"><MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" Class="mr-1" />@Item.StartTime.Value.ToString("MMM d, yyyy")</span>
+                }
+            </div>
+        }
+
+        @if (HasRealLocation)
+        {
+            <div class="d-flex align-center mt-1 mud-text-secondary" style="font-size: 0.85rem;">
+                <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Class="mr-1" />
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@Item.Address</span>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Item.Description))
+        {
+            <MudText Typo="Typo.body2" Class="mt-2 mud-text-secondary"
+                     Style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                @Item.Description
+            </MudText>
+        }
+
+        <div class="d-flex flex-wrap gap-1 mt-2">
+            @if (Item.IsVirtual)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Videocam">Virtual</MudChip>
+            }
+            @if (Item.FamilyFriendly)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Success" Icon="@Icons.Material.Filled.FamilyRestroom">Family</MudChip>
+            }
+            @if (Item.IsAccessible)
+            {
+                <MudChip T="string" Size="Size.Small" Color="Color.Default" Icon="@Icons.Material.Filled.Accessible">Accessible</MudChip>
+            }
+            @if (Item.MaxParticipants is int max && max > 0)
+            {
+                var spotsLeft = Math.Max(0, max - Item.CurrentParticipants);
+                <MudChip T="string" Size="Size.Small" Color="@(spotsLeft == 0 ? Color.Error : Color.Primary)"
+                         Icon="@Icons.Material.Filled.Groups">
+                    @(spotsLeft == 0 ? "Full" : $"{spotsLeft} spot{(spotsLeft == 1 ? "" : "s")} left")
+                </MudChip>
+            }
+        </div>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public GoodWorksModel Item { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    // Hide the location line for virtual events and for records whose reverse-geocode
+    // produced only "Unknown" placeholders (no geocoding key / lookup failure).
+    private bool HasRealLocation =>
+        !Item.IsVirtual
+        && !string.IsNullOrWhiteSpace(Item.Address)
+        && !Item.Address.Replace("Unknown", "").Replace(",", "").Trim().Equals(string.Empty);
+
+    private void Navigate() => Navigation.NavigateTo($"/goodwork/{Item.Id}");
+}

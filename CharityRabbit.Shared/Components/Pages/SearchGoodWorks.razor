@@ -9,6 +9,7 @@
 @inject ISkillService _skillService
 @inject IJSRuntime JSRuntime
 @inject CharityRabbit.Platform.IGeolocationProvider Geolocation
+@inject MudBlazor.IBrowserViewportService ViewportService
 
 <PageTitle>Search Volunteer Opportunities - CharityRabbit</PageTitle>
 
@@ -34,8 +35,16 @@
                     <!-- Filters Sidebar -->
                     <MudItem xs="12" md="3">
                         <MudPaper Elevation="2" Class="pa-3">
-                            <MudText Typo="Typo.h6" GutterBottom="true">Filters</MudText>
-                            
+                            <div class="d-flex align-center justify-space-between" style="cursor: pointer;" @onclick="ToggleFilters">
+                                <MudText Typo="Typo.h6">Filters</MudText>
+                                @* Expand/collapse affordance only matters on narrow screens, where filters
+                                   start collapsed so results are visible first. *@
+                                <MudHidden Breakpoint="Breakpoint.MdAndUp">
+                                    <MudIconButton Icon="@(_filtersOpen ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)"
+                                                   Size="MudBlazor.Size.Small" aria-label="Toggle filters" />
+                                </MudHidden>
+                            </div>
+                            <MudCollapse Expanded="_filtersOpen">
                             <!-- Category -->
                             <MudSelect @bind-Value="searchCriteria.Category" Label="Category" Clearable="true" Class="mb-3">
                                 <MudSelectItem Value="@((string?)null)">All Categories</MudSelectItem>
@@ -98,12 +107,13 @@
                                      Class="mb-2">
                                 Search
                             </MudButton>
-                            <MudButton Variant="Variant.Outlined" 
-                                     Color="Color.Secondary" 
+                            <MudButton Variant="Variant.Outlined"
+                                     Color="Color.Secondary"
                                      FullWidth="true"
                                      OnClick="ClearFilters">
                                 Clear Filters
                             </MudButton>
+                            </MudCollapse>
                         </MudPaper>
                     </MudItem>
 
@@ -147,7 +157,18 @@
                         }
                         else
                         {
-                            <MudDataGrid @ref="dataGrid" T="GoodWorksModel" Items="@searchResults" 
+                            <!-- Narrow screens (phone / MAUI WebView): tappable cards instead of the
+                                 stacked-table rendering MudDataGrid falls back to. -->
+                            <MudHidden Breakpoint="Breakpoint.MdAndUp">
+                                <MudText Typo="Typo.subtitle1" Class="mb-2">Found @searchResults.Count opportunities</MudText>
+                                @foreach (var item in searchResults)
+                                {
+                                    <GoodWorkCard Item="item" />
+                                }
+                            </MudHidden>
+
+                            <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                            <MudDataGrid @ref="dataGrid" T="GoodWorksModel" Items="@searchResults"
                                        Filterable="true" Dense="true" Hover="true">
                                 <ToolBarContent>
                                     <MudText Typo="Typo.h6">Found @searchResults.Count opportunities</MudText>
@@ -200,6 +221,7 @@
                                     <MudDataGridPager T="GoodWorksModel" />
                                 </PagerContent>
                             </MudDataGrid>
+                            </MudHidden>
                         }
                     </MudItem>
                 </MudGrid>
@@ -581,11 +603,13 @@
         { "Disaster Relief", "#EC7063" }      // Dark red
     };
 
+    private bool _filtersOpen = true;
+
     protected override async Task OnInitializedAsync()
     {
         // Get user's location
         userLocation = await TryGetUserLocation();
-        
+
         _mapOptions = new MapOptions
         {
             Zoom = 11,
@@ -596,6 +620,23 @@
         // Auto-load upcoming events on page load
         await LoadUpcomingEvents();
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Collapse the filter panel on phones so results are the first thing seen;
+            // leave it open on tablet/desktop (unchanged web behavior).
+            var breakpoint = await ViewportService.GetCurrentBreakpointAsync();
+            if (breakpoint is Breakpoint.Xs or Breakpoint.Sm && _filtersOpen)
+            {
+                _filtersOpen = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void ToggleFilters() => _filtersOpen = !_filtersOpen;
 
     private async Task OnTabChanged(int index)
     {

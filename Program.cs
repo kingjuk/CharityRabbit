@@ -93,6 +93,8 @@ internal class Program
         .AddOpenIdConnect("oidc", options =>
         {
             options.Authority = builder.Configuration["Oidc:Authority"];
+            // Local dev runs Keycloak on plain http; defaults to true everywhere else.
+            options.RequireHttpsMetadata = builder.Configuration.GetValue("Oidc:RequireHttpsMetadata", true);
             options.ClientId = builder.Configuration["Oidc:ClientId"];
             options.ClientSecret = builder.Configuration["Oidc:ClientSecret"];
             options.ResponseType = "code";
@@ -117,6 +119,8 @@ internal class Program
             {
                 options.Authority = builder.Configuration["Oidc:Authority"];
                 options.Audience = builder.Configuration["Oidc:Audience"];
+                // Local dev runs Keycloak on plain http; defaults to true everywhere else.
+                options.RequireHttpsMetadata = builder.Configuration.GetValue("Oidc:RequireHttpsMetadata", true);
                 options.TokenValidationParameters.NameClaimType = "name";
                 // Leave MapInboundClaims at its default (true) even though many samples
                 // disable it: 'sub' must arrive as ClaimTypes.NameIdentifier exactly like
@@ -248,6 +252,14 @@ internal class Program
         {
             var db = scope.ServiceProvider.GetRequiredService<CharityDbContext>();
             db.Database.Migrate();
+
+            if (args.Contains("seed-test-data"))
+            {
+                var testData = scope.ServiceProvider.GetRequiredService<TestDataService>();
+                var imported = await testData.ImportTestDataAsync();
+                Console.WriteLine($"Imported {imported} test good works.");
+                return;
+            }
 
             if (args.Contains("migrate-neo4j"))
             {

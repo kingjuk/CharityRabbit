@@ -1,0 +1,52 @@
+@implements IDisposable
+
+@inject NavigationManager NavigationManager
+@inject CharityRabbit.Maui.Services.AuthService Auth
+@inject ISnackbar Snackbar
+
+<MudNavMenu>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+    <MudNavLink Href="search" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Search">Search</MudNavLink>
+    <MudNavLink Href="organizations" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Business">Organizations</MudNavLink>
+
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="profile" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Person">My Profile</MudNavLink>
+            <MudNavLink Href="add-good-work" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Add">Add Good Works</MudNavLink>
+            <MudNavLink OnClick="LogoutAsync" Icon="@Icons.Material.Filled.Logout" IconColor="Color.Info">Logout</MudNavLink>
+        </Authorized>
+        <NotAuthorized>
+            <MudNavLink OnClick="LoginAsync" Icon="@Icons.Material.Filled.Password">Login</MudNavLink>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudNavMenu>
+
+@code {
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private async Task LoginAsync()
+    {
+        var error = await Auth.LoginAsync();
+        if (error is not null)
+        {
+            Snackbar.Add($"Sign-in failed: {error}", Severity.Error);
+        }
+    }
+
+    private async Task LogoutAsync()
+    {
+        await Auth.LogoutAsync();
+        NavigationManager.NavigateTo("/");
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => StateHasChanged();
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

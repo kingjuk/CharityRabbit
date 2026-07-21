@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>CharityRabbit</title>
+    <base href="/" />
+    <!-- Mirrors the web host's App.razor asset list (no analytics, no vis-network) -->
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link rel="icon" href="data:,">
+    <style>
+        html, body { margin: 0; padding: 0; font-family: 'Roboto', 'Helvetica Neue', sans-serif; }
+        /* MudBlazor's fixed chrome must clear the iOS status bar / Dynamic Island and the
+           bottom home indicator (viewport-fit=cover makes the WebView edge-to-edge). */
+        .mud-appbar.mud-appbar-fixed-top { padding-top: env(safe-area-inset-top); }
+        .mud-main-content { padding-top: calc(env(safe-area-inset-top) + 64px) !important; padding-bottom: env(safe-area-inset-bottom); }
+        .mud-drawer-fixed.mud-drawer-clipped-always { padding-top: calc(env(safe-area-inset-top) + var(--mud-appbar-height)); }
+        .mud-drawer-content { padding-bottom: env(safe-area-inset-bottom); }
+        #blazor-error-ui { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #b32121; color: white; padding: 0.6rem 1.25rem; z-index: 1000; }
+        #blazor-error-ui .dismiss { position: absolute; right: 0.75rem; top: 0.5rem; cursor: pointer; }
+    </style>
+</head>
+
+<body>
+
+    <div id="app">Loading...</div>
+
+    <div id="blazor-error-ui" data-nosnippet>
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_content/BlazorGoogleMaps/js/objectManager.js"></script>
+    <script src="_framework/blazor.webview.js" autostart="false"></script>
+
+</body>
+
+</html>

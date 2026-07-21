@@ -48,7 +48,7 @@ public class GoodWorksService(CharityDbContext db, IGeocodingService locationSer
 
     public async Task CreateGoodWorkAsync(GoodWorksModel goodWork, string? userId = null)
     {
-        var (city, state, country, zip) = await locationServices.GetLocationDetailsAsync(goodWork.Latitude, goodWork.Longitude);
+        var (city, state, country, zip) = await ResolveLocationAsync(goodWork.Latitude, goodWork.Longitude);
 
         var g = new GoodWork
         {
@@ -100,6 +100,20 @@ public class GoodWorksService(CharityDbContext db, IGeocodingService locationSer
         db.GoodWorks.Where(g => g.Id == id)
             .Select(g => new GoodWorkOwnership(g.CreatedBy, g.OrganizationId))
             .FirstOrDefaultAsync();
+
+    // Reverse-geocoding is best-effort: a Google outage or bad key must not block
+    // creating/updating an event, so degrade to an unknown location instead of throwing.
+    private async Task<LocationDetails> ResolveLocationAsync(double latitude, double longitude)
+    {
+        try
+        {
+            return await locationServices.GetLocationDetailsAsync(latitude, longitude);
+        }
+        catch (Exception)
+        {
+            return new LocationDetails("Unknown", "Unknown", "Unknown", "Unknown");
+        }
+    }
 
     private IQueryable<GoodWork> GoodWorksWithDetails() =>
         db.GoodWorks.Include(g => g.Contact).Include(g => g.Location).Include(g => g.Tags).Include(g => g.Skills);
@@ -288,7 +302,7 @@ public class GoodWorksService(CharityDbContext db, IGeocodingService locationSer
     {
         var g = await db.GoodWorks.Include(x => x.Contact).FirstOrDefaultAsync(x => x.Id == id && x.CreatedBy == userId);
         if (g is null) return;
-        var (city, state, country, zip) = await locationServices.GetLocationDetailsAsync(goodWork.Latitude, goodWork.Longitude);
+        var (city, state, country, zip) = await ResolveLocationAsync(goodWork.Latitude, goodWork.Longitude);
 
         g.Name = goodWork.Name;
         g.Description = goodWork.Description ?? "";
@@ -458,20 +472,26 @@ public class GoodWorksService(CharityDbContext db, IGeocodingService locationSer
 
     public async Task<List<ParticipantModel>> GetGoodWorkParticipantsAsync(long goodWorkId)
     {
-        var signups = await db.Signups.Where(s => s.GoodWorkId == goodWorkId)
+        // Project the raw DateTimeOffset then convert to DateTime in memory — EF can't
+        // translate DateTimeOffset.UtcDateTime → nullable DateTime inside a SQL projection.
+        var signups = (await db.Signups.Where(s => s.GoodWorkId == goodWorkId)
+            .Select(s => new { s.UserId, s.User.Name, s.User.Email, s.User.Phone, s.CreatedAt })
+            .ToListAsync())
             .Select(s => new ParticipantModel
             {
-                UserId = s.UserId, Name = s.User.Name ?? s.User.Email ?? "Anonymous User",
-                Email = s.User.Email ?? "", Phone = s.User.Phone,
+                UserId = s.UserId, Name = s.Name ?? s.Email ?? "Anonymous User",
+                Email = s.Email ?? "", Phone = s.Phone,
                 RelationshipType = "SIGNED_UP_FOR", EngagementDate = s.CreatedAt.UtcDateTime,
-            }).ToListAsync();
-        var interested = await db.Interested.Where(i => i.GoodWorkId == goodWorkId)
+            });
+        var interested = (await db.Interested.Where(i => i.GoodWorkId == goodWorkId)
+            .Select(i => new { i.UserId, i.User.Name, i.User.Email, i.User.Phone, i.CreatedAt })
+            .ToListAsync())
             .Select(i => new ParticipantModel
             {
-                UserId = i.UserId, Name = i.User.Name ?? i.User.Email ?? "Anonymous User",
-                Email = i.User.Email ?? "", Phone = i.User.Phone,
+                UserId = i.UserId, Name = i.Name ?? i.Email ?? "Anonymous User",
+                Email = i.Email ?? "", Phone = i.Phone,
                 RelationshipType = "INTERESTED_IN", EngagementDate = i.CreatedAt.UtcDateTime,
-            }).ToListAsync();
+            });
         return signups.Concat(interested)
             .OrderByDescending(p => p.RelationshipType).ThenByDescending(p => p.EngagementDate).ToList();
     }
