@@ -1,0 +1,26 @@
+@page "/login-retry"
+@inject NavigationManager Navigation
+
+<PageTitle>Sign-in interrupted - CharityRabbit</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Class="pa-8 d-flex flex-column align-center text-center">
+        <MudIcon Icon="@Icons.Material.Filled.LockClock" Size="Size.Large" Color="Color.Warning" Class="mb-2" />
+        <MudText Typo="Typo.h5" GutterBottom="true">Your sign-in session expired</MudText>
+        <MudText Typo="Typo.body1" Class="mud-text-secondary mb-4">
+            That usually happens when the login page sat open for a while before you finished.
+            No harm done — please try signing in again.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                   StartIcon="@Icons.Material.Filled.Login"
+                   OnClick="RetryLogin">
+            Try Signing In Again
+        </MudButton>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    // Force a full-page navigation so a fresh OIDC challenge (new state/nonce) is issued.
+    private void RetryLogin() =>
+        Navigation.NavigateTo("/authentication/login", forceLoad: true);
+}

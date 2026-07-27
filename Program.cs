@@ -107,6 +107,20 @@ internal class Program
             {
                 NameClaimType = "name",
             };
+
+            // Without this, a failed OIDC handshake (e.g. the state/nonce cookie expired because
+            // the user lingered on the login page) throws an unhandled exception and renders the
+            // generic 500 error page. Instead, swallow it and send them back to sign in cleanly.
+            options.Events.OnRemoteFailure = context =>
+            {
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>().CreateLogger("OidcRemoteFailure");
+                logger.LogWarning(context.Failure, "OIDC remote failure; redirecting to login retry.");
+
+                context.HandleResponse();
+                context.Response.Redirect("/login-retry");
+                return Task.CompletedTask;
+            };
         });
 
         builder.Services.ConfigureCookieOidcRefresh(CookieAuthenticationDefaults.AuthenticationScheme, "oidc");
