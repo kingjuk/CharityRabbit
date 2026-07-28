@@ -121,6 +121,20 @@ internal class Program
                 context.Response.Redirect("/login-retry");
                 return Task.CompletedTask;
             };
+
+            // Keycloak requires either id_token_hint or client_id on logout to honor the
+            // post_logout_redirect_uri. SaveTokens supplies id_token_hint for normal sessions,
+            // but a cookie issued before tokens were saved won't have it, yielding Keycloak's
+            // "Missing parameters: id_token_hint" page. Sending client_id as a fallback (paired
+            // with the client's registered post-logout redirect URIs) makes logout always work.
+            options.Events.OnRedirectToIdentityProviderForSignOut = context =>
+            {
+                if (string.IsNullOrEmpty(context.ProtocolMessage.IdTokenHint))
+                {
+                    context.ProtocolMessage.ClientId = context.Options.ClientId;
+                }
+                return Task.CompletedTask;
+            };
         });
 
         builder.Services.ConfigureCookieOidcRefresh(CookieAuthenticationDefaults.AuthenticationScheme, "oidc");
