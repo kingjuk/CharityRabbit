@@ -40,8 +40,8 @@ from SecureStorage, and a **Release/trimmed build deserializing live API data**
      redirect `charityrabbit://callback`, direct access grants off, `offline_access` optional.
    - Its dedicated client scope has an **Audience** mapper adding `charityrabbit-api` to
      access tokens (no separate audience-only client needed).
-   - Sign in with Apple is an identity provider (alias `apple`); the app's Apple button
-     sends `kc_idp_hint=apple`.
+   - Sign in with Apple is an identity provider (alias `apple`). The app has a single
+     "Sign In" button; Keycloak's page lists Apple, Google and email side by side.
 4. **Deploy the API** — the `/api/v1` endpoints must be live on charityrabbit.com
    (they build but the running ECS task predates them) and `Oidc:Audience=charityrabbit-api`
    present in production config.
