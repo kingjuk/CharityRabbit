@@ -35,12 +35,13 @@ from SecureStorage, and a **Release/trimmed build deserializing live API data**
 2. **App Store Connect**: create the app record, screenshots (the simulator captures
    from this session are a starting point), description, privacy questionnaire
    (the app collects account email/name and location — declare accordingly).
-3. **Keycloak (production realm `CharityRabbit` at auth.kingjuk.com)** — one-time:
-   - Client `charityrabbit-api` (audience only) + a client scope with an **Audience
-     mapper** emitting `charityrabbit-api`.
-   - Public PKCE client `charityrabbit-mobile`, redirect `charityrabbit://callback`,
-     `offline_access`, refresh-token rotation on.
-   (These already exist in the *local dev* Keycloak used for testing.)
+3. ~~**Keycloak (production realm `CharityRabbit` at auth.kingjuk.com)**~~ — done 2026-10-12:
+   - Public client `charityrabbit-mobile`: PKCE S256 required, redirect and post-logout
+     redirect `charityrabbit://callback`, direct access grants off, `offline_access` optional.
+   - Its dedicated client scope has an **Audience** mapper adding `charityrabbit-api` to
+     access tokens (no separate audience-only client needed).
+   - Sign in with Apple is an identity provider (alias `apple`); the app's Apple button
+     sends `kc_idp_hint=apple`.
 4. **Deploy the API** — the `/api/v1` endpoints must be live on charityrabbit.com
    (they build but the running ECS task predates them) and `Oidc:Audience=charityrabbit-api`
    present in production config.
