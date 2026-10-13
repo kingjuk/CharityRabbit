@@ -16,6 +16,12 @@
         .mud-main-content { padding-top: calc(env(safe-area-inset-top) + 64px) !important; padding-bottom: env(safe-area-inset-bottom); }
         .mud-drawer-fixed.mud-drawer-clipped-always { padding-top: calc(env(safe-area-inset-top) + var(--mud-appbar-height)); }
         .mud-drawer-content { padding-bottom: env(safe-area-inset-bottom); }
+        /* Sign in with Apple, per Apple's HIG: the "white with outline" style, which is correct on both
+           the dark theme (white) and the light one (outlined) — the theme toggle lives in the shared layout. */
+        .cr-apple-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px;
+                        border: 1px solid #000; border-radius: 8px; background: #fff; color: #000; font: 600 1.05rem -apple-system, system-ui, sans-serif; cursor: pointer; }
+        .cr-apple-btn svg { width: 17px; height: 20px; margin-top: -2px; }
+        .cr-apple-btn:disabled { opacity: .6; }
         #blazor-error-ui { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #b32121; color: white; padding: 0.6rem 1.25rem; z-index: 1000; }
         #blazor-error-ui .dismiss { position: absolute; right: 0.75rem; top: 0.5rem; cursor: pointer; }
     </style>

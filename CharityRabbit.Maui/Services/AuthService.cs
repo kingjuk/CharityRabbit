@@ -43,10 +43,15 @@ public class AuthService : AuthenticationStateProvider
     public override Task<AuthenticationState> GetAuthenticationStateAsync() =>
         Task.FromResult(new AuthenticationState(_principal));
 
-    /// <summary>Interactive login via the system browser. Returns an error string, or null on success.</summary>
-    public async Task<string?> LoginAsync()
+    /// <summary>Interactive login via the system browser. With <paramref name="identityProvider"/>
+    /// (e.g. <see cref="AppConfig.AppleIdentityProvider"/>) Keycloak goes straight to that provider.
+    /// Returns an error string, or null on success.</summary>
+    public async Task<string?> LoginAsync(string? identityProvider = null)
     {
-        var result = await _oidc.LoginAsync(new LoginRequest());
+        var request = new LoginRequest();
+        if (identityProvider is not null)
+            request.FrontChannelExtraParameters = new IdentityModel.Client.Parameters { { "kc_idp_hint", identityProvider } };
+        var result = await _oidc.LoginAsync(request);
         if (result.IsError)
         {
             return result.Error == "UserCancel" ? null : result.Error;

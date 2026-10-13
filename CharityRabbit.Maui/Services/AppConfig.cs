@@ -20,4 +20,7 @@ public static class AppConfig
     public const string ClientId = "charityrabbit-mobile";
     public const string RedirectUri = "charityrabbit://callback";
     public const string Scope = "openid profile email offline_access";
+    /// <summary>Alias of the Sign in with Apple identity provider in the Keycloak realm; sent as
+    /// <c>kc_idp_hint</c> so the Apple button skips Keycloak's own login page.</summary>
+    public const string AppleIdentityProvider = "apple";
 }
